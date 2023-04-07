@@ -31,6 +31,7 @@ type arm64Compiler struct {
 	withListener                 bool
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
+	tmp                          []runtimeValueLocation
 }
 
 func newArm64Compiler() compiler {
@@ -54,6 +55,7 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		ir: ir, withListener: withListener, labels: c.labels,
 		typ: typ,
 		br:  c.br,
+		tmp: c.tmp,
 	}
 }
 
@@ -904,32 +906,28 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 
 	// [Emit the code for each targets and default branch]
 	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
-	saved := c.locationStack
+
+	initialLocationStack := c.locationStack
+	if uint64(len(c.tmp)) <= initialLocationStack.sp {
+		c.tmp = make([]runtimeValueLocation, initialLocationStack.sp)
+	}
+	copy(c.tmp, initialLocationStack.stack[:initialLocationStack.sp])
+	initialLocationStack.stack = c.tmp
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.
 		init := c.assembler.CompileStandAlone(arm64.NOP)
 		labelInitialInstructions[i] = init
 
-		var locationStack runtimeValueLocationStack
 		targetLabel := wazeroir.Label(o.Us[i*2])
 		targetToDrop := o.Us[i*2+1]
-		if i < len(labelInitialInstructions)-1 {
-			// Clone the location stack so the branch-specific code doesn't
-			// affect others.
-			locationStack = saved.clone()
-		} else {
-			// If this is the default branch, we use the original one
-			// as this is the last code in this block.
-			locationStack = saved
-		}
-		c.setLocationStack(locationStack)
 		if err = compileDropRange(c, targetToDrop); err != nil {
 			return err
 		}
 		if err = c.compileBranchInto(targetLabel); err != nil {
 			return err
 		}
+		c.locationStack.cloneFrom(initialLocationStack)
 	}
 
 	c.assembler.BuildJumpTable(offsetData, labelInitialInstructions)

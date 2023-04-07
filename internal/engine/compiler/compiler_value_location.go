@@ -172,6 +172,15 @@ func (v *runtimeValueLocationStack) clone() runtimeValueLocationStack {
 	return ret
 }
 
+func (v *runtimeValueLocationStack) cloneFrom(from runtimeValueLocationStack) {
+	// Assigns the same values for fields except for the stack which we want to reuse.
+	prev := v.stack
+	*v = from
+	v.stack = prev
+	// Copy the content in the stack.
+	copy(v.stack, from.stack)
+}
+
 // pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given register and pushes onto
 // the location stack.
 func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (loc *runtimeValueLocation) {

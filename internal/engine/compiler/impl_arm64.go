@@ -21,7 +21,7 @@ type arm64Compiler struct {
 	ir        *wazeroir.CompilationResult
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
-	locationStack runtimeValueLocationStack
+	locationStack *runtimeValueLocationStack
 	// labels maps a label (e.g. ".L1_then") to *arm64LabelInfo.
 	labels [wazeroir.LabelKindNum][]arm64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
@@ -44,18 +44,22 @@ func newArm64Compiler() compiler {
 
 // Init implements compiler.Init.
 func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
-	assembler, locationStack := c.assembler, c.locationStack
-	assembler.Reset()
-	locationStack.reset()
+	c.assembler.Reset()
 	for i := range c.labels {
-		c.labels[i] = c.labels[i][:0]
+		for j := range c.labels[i] {
+			l := &c.labels[i][j]
+			l.initialInstruction = nil
+			l.initialStack.reset()
+		}
 	}
 	*c = arm64Compiler{
-		assembler: assembler, locationStack: locationStack,
-		ir: ir, withListener: withListener, labels: c.labels,
-		typ: typ,
-		br:  c.br,
-		tmp: c.tmp,
+		assembler:     c.assembler,
+		locationStack: locationStack,
+		ir:            ir, withListener: withListener,
+		labels: c.labels,
+		typ:    typ,
+		br:     c.br,
+		tmp:    c.tmp,
 	}
 }
 
@@ -169,7 +173,7 @@ func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *arm64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
-	return &c.locationStack
+	return c.locationStack
 }
 
 // pushRuntimeValueLocationOnRegister implements compiler.pushRuntimeValueLocationOnRegister for arm64.
@@ -457,7 +461,7 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *arm64Compiler) setLocationStack(newStack runtimeValueLocationStack) {
+func (c *arm64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -496,7 +500,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.UnionOperation) (skipThisLabel 
 	}
 
 	// Set the initial stack.
-	c.setLocationStack(labelInfo.initialStack)
+	c.setLocationStack(&labelInfo.initialStack)
 	return false
 }
 
@@ -907,7 +911,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	// [Emit the code for each targets and default branch]
 	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
 
-	initialLocationStack := c.locationStack
+	initialLocationStack := *c.locationStack
 	if uint64(len(c.tmp)) <= initialLocationStack.sp {
 		c.tmp = make([]runtimeValueLocation, initialLocationStack.sp)
 	}

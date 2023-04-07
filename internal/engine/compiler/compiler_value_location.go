@@ -109,8 +109,8 @@ func (v *runtimeValueLocation) String() string {
 	return fmt.Sprintf("{type=%s,location=%s}", v.valueType, location)
 }
 
-func newRuntimeValueLocationStack() runtimeValueLocationStack {
-	return runtimeValueLocationStack{
+func newRuntimeValueLocationStack() *runtimeValueLocationStack {
+	return &runtimeValueLocationStack{
 		stack:                             make([]runtimeValueLocation, 10),
 		unreservedVectorRegisters:         unreservedVectorRegisters,
 		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,

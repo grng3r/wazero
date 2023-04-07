@@ -755,16 +755,10 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	// Emit the code for branching into else branch.
 	// We save and clone the location stack because we might end up modifying it inside of branchInto,
 	// and we have to avoid affecting the code generation for Then branch afterwards.
-	saved := c.locationStack
-	c.setLocationStack(saved.clone())
 	elseTarget := wazeroir.Label(o.U2)
 	if err := c.compileBranchInto(elseTarget); err != nil {
 		return err
 	}
-
-	// Now ready to emit the code for branching into then branch.
-	// Retrieve the original value location stack so that the code below won't be affected by the Else branch ^^.
-	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
 	thenTarget := wazeroir.Label(o.U1)

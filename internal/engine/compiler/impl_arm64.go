@@ -32,29 +32,33 @@ type arm64Compiler struct {
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
 	tmp                          []runtimeValueLocation
+	locationStackForEntrypoint   runtimeValueLocationStack
 }
 
 func newArm64Compiler() compiler {
 	return &arm64Compiler{
-		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
-		locationStack: newRuntimeValueLocationStack(),
-		br:            bytes.NewReader(nil),
+		assembler:                  arm64.NewAssembler(arm64ReservedRegisterForTemporary),
+		locationStackForEntrypoint: newRuntimeValueLocationStack(),
+		br:                         bytes.NewReader(nil),
 	}
 }
 
 // Init implements compiler.Init.
 func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
 	c.assembler.Reset()
+	c.locationStackForEntrypoint.reset()
+	lse := c.locationStackForEntrypoint
 	for i := range c.labels {
 		for j := range c.labels[i] {
 			l := &c.labels[i][j]
 			l.initialInstruction = nil
+			l.stackInitialized = false
 			l.initialStack.reset()
 		}
 	}
 	*c = arm64Compiler{
 		assembler:     c.assembler,
-		locationStack: locationStack,
+		locationStack: &lse,
 		ir:            ir, withListener: withListener,
 		labels: c.labels,
 		typ:    typ,
@@ -148,7 +152,8 @@ type arm64LabelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can branch into it.
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
-	initialStack runtimeValueLocationStack
+	initialStack     runtimeValueLocationStack
+	stackInitialized bool
 }
 
 // assignStackPointerCeil implements compilerImpl.assignStackPointerCeil for the arm64 architecture.
@@ -165,7 +170,11 @@ func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
-		frames = append(frames, make([]arm64LabelInfo, diff*2)...)
+		for i := 0; i < diff; i++ {
+			frames = append(frames, arm64LabelInfo{
+				initialStack: newRuntimeValueLocationStack(),
+			})
+		}
 		c.labels[kind] = frames
 	}
 	return &frames[frameID]
@@ -245,6 +254,7 @@ func (c *arm64Compiler) compilePreamble() error {
 func (c *arm64Compiler) compileMaybeGrowStack() error {
 	tmpX, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	if !found {
+		fmt.Println(c.locationStack.String())
 		panic("BUG: all the registers should be free at this point")
 	}
 	c.markRegisterUsed(tmpX)
@@ -486,7 +496,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.UnionOperation) (skipThisLabel 
 	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if !labelInfo.initialStack.initialized() {
+	if !labelInfo.stackInitialized {
 		skipThisLabel = true
 		return
 	}
@@ -790,8 +800,9 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		targetLabel := c.label(target)
-		if !targetLabel.initialStack.initialized() {
-			targetLabel.initialStack = c.locationStack.clone()
+		if !targetLabel.stackInitialized {
+			targetLabel.initialStack.cloneFrom(*c.locationStack)
+			targetLabel.stackInitialized = true
 		}
 
 		br := c.assembler.CompileJump(arm64.B)

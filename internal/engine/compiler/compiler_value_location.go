@@ -109,8 +109,8 @@ func (v *runtimeValueLocation) String() string {
 	return fmt.Sprintf("{type=%s,location=%s}", v.valueType, location)
 }
 
-func newRuntimeValueLocationStack() *runtimeValueLocationStack {
-	return &runtimeValueLocationStack{
+func newRuntimeValueLocationStack() runtimeValueLocationStack {
+	return runtimeValueLocationStack{
 		stack:                             make([]runtimeValueLocation, 10),
 		unreservedVectorRegisters:         unreservedVectorRegisters,
 		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
@@ -141,14 +141,13 @@ type runtimeValueLocationStack struct {
 	unreservedGeneralPurposeRegisters, unreservedVectorRegisters []asm.Register
 }
 
-func (v *runtimeValueLocationStack) initialized() bool {
-	return len(v.unreservedGeneralPurposeRegisters) > 0
-}
-
 func (v *runtimeValueLocationStack) reset() {
-	v.stackPointerCeil, v.sp = 0, 0
-	v.stack = v.stack[:0]
-	v.usedRegisters = usedRegistersMask(0)
+	stack := v.stack[:0]
+	*v = runtimeValueLocationStack{
+		unreservedVectorRegisters:         unreservedVectorRegisters,
+		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
+		stack:                             stack,
+	}
 }
 
 func (v *runtimeValueLocationStack) String() string {
@@ -160,25 +159,16 @@ func (v *runtimeValueLocationStack) String() string {
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
-func (v *runtimeValueLocationStack) clone() runtimeValueLocationStack {
-	ret := runtimeValueLocationStack{}
-	ret.sp = v.sp
-	ret.usedRegisters = v.usedRegisters
-	ret.stack = make([]runtimeValueLocation, len(v.stack))
-	copy(ret.stack, v.stack)
-	ret.stackPointerCeil = v.stackPointerCeil
-	ret.unreservedGeneralPurposeRegisters = v.unreservedGeneralPurposeRegisters
-	ret.unreservedVectorRegisters = v.unreservedVectorRegisters
-	return ret
-}
-
 func (v *runtimeValueLocationStack) cloneFrom(from runtimeValueLocationStack) {
 	// Assigns the same values for fields except for the stack which we want to reuse.
 	prev := v.stack
 	*v = from
 	v.stack = prev
 	// Copy the content in the stack.
-	copy(v.stack, from.stack)
+	if len(v.stack) < int(from.sp) {
+		v.stack = make([]runtimeValueLocation, from.sp)
+	}
+	copy(v.stack, from.stack[:from.sp])
 }
 
 // pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given register and pushes onto

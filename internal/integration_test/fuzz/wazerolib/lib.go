@@ -11,7 +11,8 @@ import (
 
 func main() {}
 
-const failedCasesDir = "wazerolib/testdata"
+// change if needed
+const failedCasesDir = "testdata" //"wazerolib/testdata"
 
 // saveFailedBinary writes binary and wat into failedCasesDir so that it is easy to reproduce the error.
 func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {

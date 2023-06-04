@@ -58,6 +58,17 @@ type (
 	//
 	// This implements api.Module.
 	ModuleInstance struct {
+		// Closed is used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
+		//
+		// The update value is closedType + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
+		//
+		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
+		// See /RATIONALE.md
+		//
+		// TODO: Retype this to atomic.Unit64 when Go 1.18 is no longer supported. Until then, keep Closed at the top of
+		// this struct. See PR #1299 for an implementation and discussion.
+		Closed uint64
+
 		ModuleName     string
 		Exports        map[string]*Export
 		Globals        []*GlobalInstance
@@ -88,19 +99,11 @@ type (
 		//
 		// # Notes
 		//
-		//   - This is a part of CallContext so that scope and Close is coherent.
+		//   - This is a part of ModuleInstance so that scope and Close is coherent.
 		//   - This is not exposed outside this repository (as a host function
 		//	  parameter) because we haven't thought through capabilities based
 		//	  security implications.
 		Sys *internalsys.Context
-
-		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
-		//
-		// The update value is closedType + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
-		//
-		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
-		// See /RATIONALE.md
-		Closed uint64
 
 		// CodeCloser is non-nil when the code should be closed after this module.
 		CodeCloser api.Closer
@@ -268,7 +271,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 //
 // * ctx: the default context used for function calls.
 // * name: the name of the module.
-// * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
+// * sys: the system context, which will be closed (SysContext.Close) on ModuleInstance.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(

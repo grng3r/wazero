@@ -19,13 +19,13 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	env.addTable(&wasm.TableInstance{References: table})
 	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 	// and the typeID  matches the table[targetOffset]'s type ID.
-	operation := wazeroir.OperationCallIndirect{TypeIndex: 0}
+	operation := operationPtr(wazeroir.NewOperationCallIndirect(0, 0))
 	env.module().TypeIDs = []wasm.FunctionTypeID{0}
 	env.module().Engine = &moduleEngine{functions: []function{}}
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		err = compiler.compileReturnFunction()
@@ -43,10 +43,9 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Types:     []wasm.FunctionType{{}},
-		HasTable:  true,
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Types:    []wasm.FunctionType{{}},
+		HasTable: true,
 	}).(*arm64Compiler)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -69,7 +68,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newArm64Compiler, nil).(*arm64Compiler)
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -99,11 +98,6 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-}
-
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
 }
 
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.

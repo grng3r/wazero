@@ -119,13 +119,13 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			for _, g := range tc.moduleInstance.Globals {
 				ir.Globals = append(ir.Globals, g.Type)
 			}
-			compiler := env.requireNewCompiler(t, newCompiler, ir)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, ir)
 			me := &moduleEngine{functions: make([]function, 10)}
 			tc.moduleInstance.Engine = me
 
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
-			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters), "expected no usedRegisters")
+			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters.list()), "expected no usedRegisters")
 
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
@@ -179,16 +179,14 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 		for _, baseOffset := range []uint64{5, 10, 20} {
 			t.Run(fmt.Sprintf("%d", baseOffset), func(t *testing.T) {
 				env := newCompilerEnvironment()
-				compiler := env.requireNewCompiler(t, newCompiler, nil)
+				compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
-				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
-
 				stackLen := uint64(len(env.stack()))
 				stackBasePointer := stackLen - baseOffset // Ceil <= stackLen - stackBasePointer = no need to grow!
-				compiler.getOnStackPointerCeilDeterminedCallBack()(stackPointerCeil)
+				compiler.assignStackPointerCeil(stackPointerCeil)
 				env.setStackBasePointer(stackBasePointer)
 
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
@@ -227,7 +225,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				env := newCompilerEnvironment()
-				compiler := env.requireNewCompiler(t, newCompiler, nil)
+				compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 				err := compiler.compilePreamble()
 				require.NoError(t, err)

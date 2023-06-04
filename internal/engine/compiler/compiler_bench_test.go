@@ -26,7 +26,7 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				}
 
 				compiler := newCompiler()
-				compiler.Init(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}}, false)
+				compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
 				err := compiler.compilePreamble()
 				requireNoError(b, err)
 
@@ -37,11 +37,11 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 					destOffset, sourceOffset = 777, 1
 				}
 
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: destOffset})
+				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(destOffset)))
 				requireNoError(b, err)
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: sourceOffset})
+				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(sourceOffset)))
 				requireNoError(b, err)
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: size})
+				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(size)))
 				requireNoError(b, err)
 				err = compiler.compileMemoryCopy()
 				requireNoError(b, err)
@@ -79,16 +79,16 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			}
 
 			compiler := newCompiler()
-			compiler.Init(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}}, false)
+			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
 
 			var startOffset uint32 = 100
 			var value uint8 = 5
 
-			err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: startOffset})
+			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(startOffset)))
 			requireNoError(b, err)
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(value)})
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(value))))
 			requireNoError(b, err)
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: size})
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(size)))
 			requireNoError(b, err)
 			err = compiler.compileMemoryFill()
 			requireNoError(b, err)
@@ -123,6 +123,6 @@ func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
 
 func requireNoError(b *testing.B, err error) {
 	if err != nil {
-		b.Fatal(err)
+		panic(err)
 	}
 }

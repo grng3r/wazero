@@ -16,26 +16,25 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: &wasm.FunctionType{},
-				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
-			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
 
 			// Emit the code.
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			op := wazeroir.OperationGlobalGet{Index: 1}
+			op := operationPtr(wazeroir.NewOperationGlobalGet(1))
 			err = compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := compiler.runtimeValueLocationStack().peek()
 			require.True(t, global.onRegister())
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			switch tp {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isVectorRegister(global.register))
@@ -63,26 +62,25 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	const v128Type = wasm.ValueTypeV128
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
-	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+	// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 	globals := []*wasm.GlobalInstance{nil, {Val: 12345, ValHi: 6789, Type: wasm.GlobalType{ValType: v128Type}}}
 	env.addGlobals(globals...)
 
 	// Emit the code.
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
-	op := wazeroir.OperationGlobalGet{Index: 1}
+	op := operationPtr(wazeroir.NewOperationGlobalGet(1))
 	err = compiler.compileGlobalGet(op)
 	require.NoError(t, err)
 
 	// At this point, the top of stack must be the retrieved global on a register.
 	global := compiler.runtimeValueLocationStack().peek()
 	require.True(t, global.onRegister())
-	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 	require.True(t, isVectorRegister(global.register))
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -115,12 +113,11 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: &wasm.FunctionType{},
-				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
-			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: wasm.GlobalType{ValType: tp}})
 
 			err := compiler.compilePreamble()
@@ -140,7 +137,8 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			}
 			env.stack()[loc.stackPointer] = valueToSet
 
-			op := wazeroir.OperationGlobalSet{Index: 1}
+			const index = 1
+			op := operationPtr(wazeroir.NewOperationGlobalSet(index))
 			err = compiler.compileGlobalSet(op)
 			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 
@@ -155,7 +153,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			env.exec(code)
 
 			// The global value should be set to valueToSet.
-			actual := env.globals()[op.Index]
+			actual := env.globals()[index]
 			require.Equal(t, valueToSet, actual.Val)
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
@@ -168,12 +166,11 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	const valueToSetLo, valueToSetHi uint64 = 0xffffff, 1
 
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
-	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+	// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 	env.addGlobals(nil, &wasm.GlobalInstance{Val: 0, ValHi: 0, Type: wasm.GlobalType{ValType: v128Type}})
 
 	err := compiler.compilePreamble()
@@ -187,7 +184,8 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	hi.valueType = runtimeValueTypeV128Hi
 	env.stack()[hi.stackPointer] = valueToSetHi
 
-	op := wazeroir.OperationGlobalSet{Index: 1}
+	const index = 1
+	op := operationPtr(wazeroir.NewOperationGlobalSet(index))
 	err = compiler.compileGlobalSet(op)
 	requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 	require.NoError(t, err)
@@ -204,7 +202,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
 	// The global value should be set to valueToSet.
-	actual := env.globals()[op.Index]
+	actual := env.globals()[index]
 	require.Equal(t, valueToSetLo, actual.Val)
 	require.Equal(t, valueToSetHi, actual.ValHi)
 }

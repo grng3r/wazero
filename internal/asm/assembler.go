@@ -90,9 +90,19 @@ type StaticConstPool struct {
 	PoolSizeInBytes int
 }
 
-// NewStaticConstPool returns the pointer to a new StaticConstPool.
-func NewStaticConstPool() *StaticConstPool {
-	return &StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+func NewStaticConstPool() StaticConstPool {
+	return StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+}
+
+// Reset resets the *StaticConstPool for reuse.
+func (p *StaticConstPool) Reset() {
+	for _, c := range p.Consts {
+		delete(p.addedConsts, c)
+	}
+	// Reuse the slice to avoid re-allocations.
+	p.Consts = p.Consts[:0]
+	p.PoolSizeInBytes = 0
+	p.FirstUseOffsetInBinary = nil
 }
 
 // AddConst adds a *StaticConst into the pool if it's not already added.
@@ -125,12 +135,18 @@ type AssemblerBase interface {
 
 	// SetJumpTargetOnNext instructs the assembler that the next node must be
 	// assigned to the given node's jump destination.
-	SetJumpTargetOnNext(nodes ...Node)
+	SetJumpTargetOnNext(node Node)
 
 	// BuildJumpTable calculates the offsets between the first instruction `initialInstructions[0]`
 	// and others (e.g. initialInstructions[3]), and wrote the calculated offsets into pre-allocated
 	// `table` StaticConst in little endian.
 	BuildJumpTable(table *StaticConst, initialInstructions []Node)
+
+	// AllocateNOP allocates Node for NOP instruction.
+	AllocateNOP() Node
+
+	// Add appends the given `Node` in the assembled linked list.
+	Add(Node)
 
 	// CompileStandAlone adds an instruction to take no arguments.
 	CompileStandAlone(instruction Instruction) Node

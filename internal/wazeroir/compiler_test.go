@@ -1,7 +1,6 @@
 package wazeroir
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -48,14 +47,12 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -66,33 +63,13 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
-		},
-		{
-			name: "host go nullary",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
-			},
-			expected: &CompilationResult{},
-		},
-		{
-			name: "host go context.Context api.Module uses memory",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
-			},
-			expected: &CompilationResult{UsesMemory: true},
 		},
 		{
 			name: "identity",
@@ -102,12 +79,12 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$x]
-					OperationPick{Depth: 0},                                 // [$x, $x]
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$x]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
+				Operations: []UnionOperation{ // begin with params: [$x]
+					NewOperationPick(0, false),                         // [$x, $x]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [$x]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Types: []wasm.FunctionType{
 					{
 						Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
@@ -116,12 +93,6 @@ func TestCompile(t *testing.T) {
 					},
 				},
 				Functions: []uint32{0},
-				Signature: &wasm.FunctionType{
-					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
-					ParamNumInUint64:  1,
-					ResultNumInUint64: 1,
-				},
-				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -137,17 +108,15 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationConstI32{Value: 8}, // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationConstI32(8), // [8]
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					NewOperationDrop(InclusiveRange{}),                                    // []
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),                          // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -164,17 +133,15 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationConstI32{Value: 8}, // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationConstI32(8), // [8]
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					NewOperationDrop(InclusiveRange{}),                                    // []
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),                          // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -188,25 +155,19 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$delta]
-					OperationPick{Depth: 0}, // [$delta, $delta]
-					OperationMemoryGrow{},   // [$delta, $old_size]
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$old_size]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
+				Operations: []UnionOperation{ // begin with params: [$delta]
+					NewOperationPick(0, false),                         // [$delta, $delta]
+					NewOperationMemoryGrow(),                           // [$delta, $old_size]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [$old_size]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
+				LabelCallers: map[Label]uint32{},
 				Types: []wasm.FunctionType{{
 					Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
 					ParamNumInUint64:  1,
 					ResultNumInUint64: 1,
 				}},
-				Functions: []uint32{0},
-				Signature: &wasm.FunctionType{
-					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
-					ParamNumInUint64:  1,
-					ResultNumInUint64: 1,
-				},
-				TableTypes: []wasm.RefType{},
+				Functions:  []uint32{0},
 				UsesMemory: true,
 			},
 		},
@@ -223,17 +184,12 @@ func TestCompile(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
+			c, err := NewCompiler(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
 
-			fn := res[0]
-			if fn.GoFunc != nil { // can't compare functions
-				// Special case because reflect.Value can't be compared with Equals
-				require.Equal(t, tc.expected.UsesMemory, fn.UsesMemory)
-				require.Equal(t, &tc.module.CodeSection[0].GoFunc, &fn.GoFunc)
-			} else {
-				require.Equal(t, tc.expected, fn)
-			}
+			fn, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, fn)
 		})
 	}
 }
@@ -262,23 +218,17 @@ func TestCompile_Block(t *testing.T) {
 			// Above set manually until the text compiler supports this:
 			// (func (export "type-i32-i32") (block (drop (i32.add (br 0)))))
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationBr{
-						Target: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
-					},
-					OperationLabel{
-						Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
-					},
-					OperationBr{Target: Label{Kind: LabelKindReturn}},
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),    // arbitrary FrameID
+					NewOperationLabel(NewLabel(LabelKindContinuation, 2)), // arbitrary FrameID
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
 				// Note: i32.add comes after br 0 so is unreachable. Compilation succeeds when it feels like it
 				// shouldn't because the br instruction is stack-polymorphic. In other words, (br 0) substitutes for the
 				// two i32 parameters to add.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1},
+				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 	}
@@ -343,27 +293,28 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: []
-			OperationConstI32{16},                             // [16]
-			OperationConstI32{0},                              // [16, 0]
-			OperationConstI32{7},                              // [16, 0, 7]
-			OperationMemoryInit{1},                            // []
-			OperationDataDrop{1},                              // []
-			OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+		Operations: []UnionOperation{ // begin with params: []
+			NewOperationConstI32(16),                     // [16]
+			NewOperationConstI32(0),                      // [16, 0]
+			NewOperationConstI32(7),                      // [16, 0, 7]
+			NewOperationMemoryInit(1),                    // []
+			NewOperationDataDrop(1),                      // []
+			NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 		},
 		HasMemory:        true,
 		UsesMemory:       true,
 		HasDataInstances: true,
-		LabelCallers:     map[LabelID]uint32{},
-		Signature:        &v_v,
+		LabelCallers:     map[Label]uint32{},
 		Functions:        []wasm.Index{0},
 		Types:            []wasm.FunctionType{v_v},
-		TableTypes:       []wasm.RefType{},
 	}
 
-	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_MultiValue(t *testing.T) {
@@ -396,17 +347,15 @@ func TestCompile_MultiValue(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$x, $y]
-					OperationPick{Depth: 0},                                 // [$x, $y, $y]
-					OperationPick{Depth: 2},                                 // [$x, $y, $y, $x]
-					OperationDrop{Depth: &InclusiveRange{Start: 2, End: 3}}, // [$y, $x]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
+				Operations: []UnionOperation{ // begin with params: [$x, $y]
+					NewOperationPick(0, false),                         // [$x, $y, $y]
+					NewOperationPick(2, false),                         // [$x, $y, $y, $x]
+					NewOperationDrop(InclusiveRange{Start: 2, End: 3}), // [$y, $x]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
-				Signature:    &i32i32_i32i32,
+				LabelCallers: map[Label]uint32{},
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{i32i32_i32i32},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -432,24 +381,18 @@ func TestCompile_MultiValue(t *testing.T) {
 			//   )
 			// )
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationConstF64{Value: 4}, // [4]
-					OperationConstF64{Value: 5}, // [4, 5]
-					OperationBr{
-						Target: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
-					},
-					OperationLabel{
-						Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
-					},
-					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationConstF64(4),                               // [4]
+					NewOperationConstF64(5),                               // [4, 5]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),    // arbitrary FrameID
+					NewOperationLabel(NewLabel(LabelKindContinuation, 2)), // arbitrary FrameID
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),          // return!
 				},
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1}, // arbitrary label
-				Signature:    &v_f64f64,
+				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1}, // arbitrary label
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{v_f64f64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -463,16 +406,14 @@ func TestCompile_MultiValue(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: []
-					OperationConstI32{Value: 306},                     // [306]
-					OperationConstI64{Value: 356},                     // [306, 356]
-					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				Operations: []UnionOperation{ // begin with params: []
+					NewOperationConstI32(306),                    // [306]
+					NewOperationConstI64(356),                    // [306, 356]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
-				LabelCallers: map[LabelID]uint32{},
-				Signature:    &_i32i64,
+				LabelCallers: map[Label]uint32{},
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{_i32i64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -498,34 +439,33 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$0]
-					OperationConstI32{Value: 1}, // [$0, 1]
-					OperationPick{Depth: 1},     // [$0, 1, $0]
-					OperationBrIf{ // [$0, 1]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
-					},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					OperationConstI32{Value: 2},         // [$0, 1, 2]
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
-					OperationConstI32{Value: uint32(api.EncodeI32(-2))}, // [$0, 1, -2]
-					OperationAdd{Type: UnsignedTypeI32},                 // [$0, -1]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},
+				Operations: []UnionOperation{ // begin with params: [$0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationPick(1, false), // [$0, 1, $0]
+					NewOperationBrIf( // [$0, 1]
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
+					),
+					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
+					NewOperationConstI32(2),          // [$0, 1, 2]
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindElse, 2)),
+					NewOperationConstI32(uint32(api.EncodeI32(-2))), // [$0, 1, -2]
+					NewOperationAdd(UnsignedTypeI32),                // [$0, -1]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
-				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+				LabelCallers: map[Label]uint32{
+					NewLabel(LabelKindHeader, 2):       1,
+					NewLabel(LabelKindContinuation, 2): 2,
+					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32},
 			},
 		},
 		{
@@ -556,33 +496,32 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$0]
-					OperationConstI32{Value: 1}, // [$0, 1]
-					OperationConstI32{Value: 2}, // [$0, 1, 2]
-					OperationPick{Depth: 2},     // [$0, 1, 2, $0]
-					OperationBrIf{ // [$0, 1, 2]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
-					},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
-					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},
+				Operations: []UnionOperation{ // begin with params: [$0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationConstI32(2),    // [$0, 1, 2]
+					NewOperationPick(2, false), // [$0, 1, 2, $0]
+					NewOperationBrIf( // [$0, 1, 2]
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
+					),
+					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindElse, 2)),
+					NewOperationSub(UnsignedTypeI32), // [$0, -1]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
-				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+				LabelCallers: map[Label]uint32{
+					NewLabel(LabelKindHeader, 2):       1,
+					NewLabel(LabelKindContinuation, 2): 2,
+					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 		{
@@ -613,33 +552,32 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []Operation{ // begin with params: [$0]
-					OperationConstI32{Value: 1}, // [$0, 1]
-					OperationConstI32{Value: 2}, // [$0, 1, 2]
-					OperationPick{Depth: 2},     // [$0, 1, 2, $0]
-					OperationBrIf{ // [$0, 1, 2]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
-					},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
-					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
-					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: Label{Kind: LabelKindReturn}},
+				Operations: []UnionOperation{ // begin with params: [$0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationConstI32(2),    // [$0, 1, 2]
+					NewOperationPick(2, false), // [$0, 1, 2, $0]
+					NewOperationBrIf( // [$0, 1, 2]
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
+					),
+					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindElse, 2)),
+					NewOperationSub(UnsignedTypeI32), // [$0, -1]
+					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
+					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
-				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+				LabelCallers: map[Label]uint32{
+					NewLabel(LabelKindHeader, 2):       1,
+					NewLabel(LabelKindContinuation, 2): 2,
+					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 	}
@@ -655,9 +593,12 @@ func TestCompile_MultiValue(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
+			c, err := NewCompiler(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0])
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual)
 		})
 	}
 }
@@ -674,28 +615,26 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: [$0]
-			OperationPick{Depth: 0}, // [$0, $0]
-			OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
-				InputType:   Float32,
-				OutputType:  SignedInt32,
-				NonTrapping: true,
-			},
-			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
-			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
+		Operations: []UnionOperation{ // begin with params: [$0]
+			NewOperationPick(0, false), // [$0, $0]
+			NewOperationITruncFromF( // [$0, i32.trunc_sat_f32_s($0)]
+				Float32,
+				SignedInt32,
+				true,
+			),
+			NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [i32.trunc_sat_f32_s($0)]
+			NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 		},
-		LabelCallers: map[LabelID]uint32{},
-		Signature:    &f32_i32,
+		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{f32_i32},
-		TableTypes:   []wasm.RefType{},
 	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
-	res, err := CompileFunctions(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 // TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
@@ -709,33 +648,36 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: [$0]
-			OperationPick{Depth: 0},                                 // [$0, $0]
-			OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
-			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
-			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
+		Operations: []UnionOperation{ // begin with params: [$0]
+			NewOperationPick(0, false),                         // [$0, $0]
+			NewOperationSignExtend32From8(),                    // [$0, i32.extend8_s($0)]
+			NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [i32.extend8_s($0)]
+			NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 		},
-		LabelCallers: map[LabelID]uint32{},
-		Signature:    &i32_i32,
+		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{i32_i32},
-		TableTypes:   []wasm.RefType{},
 	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
-	res, err := CompileFunctions(api.CoreFeatureSignExtensionOps, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureSignExtensionOps, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func requireCompilationResult(t *testing.T, enabledFeatures api.CoreFeatures, expected *CompilationResult, module *wasm.Module) {
 	if enabledFeatures == 0 {
 		enabledFeatures = api.CoreFeaturesV2
 	}
-	res, err := CompileFunctions(enabledFeatures, 0, module, false)
+	c, err := NewCompiler(enabledFeatures, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
@@ -760,31 +702,30 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: []
-			OperationConstI32{},
-			OperationCallIndirect{TypeIndex: 2, TableIndex: 5},
-			OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+		Operations: []UnionOperation{ // begin with params: []
+			NewOperationConstI32(0),
+			NewOperationCallIndirect(2, 5),
+			NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 		},
 		HasTable:     true,
-		LabelCallers: map[LabelID]uint32{},
-		Signature:    &v_v,
+		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
-		TableTypes: []wasm.RefType{
-			wasm.RefTypeExternref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref,
-		},
-		Types: []wasm.FunctionType{v_v, v_v, v_v},
+		Types:        []wasm.FunctionType{v_v, v_v, v_v},
 	}
 
-	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_Refs(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "ref.func",
@@ -793,10 +734,10 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationRefFunc{FunctionIndex: 100},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationRefFunc(100),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -806,10 +747,10 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI64{Value: 0},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI64(0),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -819,10 +760,10 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI64{Value: 0},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI64(0),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -833,11 +774,11 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationRefFunc{FunctionIndex: 100},
-				OperationEqz{Type: UnsignedInt64},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationRefFunc(100),
+				NewOperationEqz(UnsignedInt64),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -848,11 +789,11 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI64{Value: 0},
-				OperationEqz{Type: UnsignedInt64},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI64(0),
+				NewOperationEqz(UnsignedInt64),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 	}
@@ -865,9 +806,12 @@ func TestCompile_Refs(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -876,7 +820,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "table.get",
@@ -886,11 +830,11 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI32{Value: 10},
-				OperationTableGet{TableIndex: 0},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI32(10),
+				NewOperationTableGet(0),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -901,11 +845,11 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeTableSet, 0,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI32{Value: 10},
-				OperationConstI64{Value: 0},
-				OperationTableSet{TableIndex: 0},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI32(10),
+				NewOperationConstI64(0),
+				NewOperationTableSet(0),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -916,11 +860,11 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeTableSet, 0,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI32{Value: 10},
-				OperationRefFunc{FunctionIndex: 1},
-				OperationTableSet{TableIndex: 0},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI32(10),
+				NewOperationRefFunc(1),
+				NewOperationTableSet(0),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 	}
@@ -934,9 +878,12 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -945,7 +892,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "table.grow",
@@ -955,12 +902,12 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableGrow, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI64{Value: 0}, // Null ref.
-				OperationConstI32{Value: 1},
-				OperationTableGrow{TableIndex: 1},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI64(0), // Null ref.
+				NewOperationConstI32(1),
+				NewOperationTableGrow(1),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -972,12 +919,12 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableFill, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationConstI32{Value: 10},
-				OperationConstI64{Value: 0}, // Null ref.
-				OperationConstI32{Value: 1},
-				OperationTableFill{TableIndex: 1},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI32(10),
+				NewOperationConstI64(0), // Null ref.
+				NewOperationConstI32(1),
+				NewOperationTableFill(1),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -986,10 +933,10 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableSize, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []Operation{
-				OperationTableSize{TableIndex: 1},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationTableSize(1),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 	}
@@ -1003,10 +950,13 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
-			require.True(t, res[0].HasTable)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
+			require.True(t, actual.HasTable)
 		})
 	}
 }
@@ -1015,7 +965,7 @@ func TestCompile_Locals(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "local.get - func param - v128",
@@ -1027,10 +977,10 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
-				OperationPick{Depth: 1, IsTargetVector: true}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationPick(1, true), // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1043,10 +993,10 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
-				OperationPick{Depth: 0, IsTargetVector: false}, // [param[0]] -> [param[0], param[0]]
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationPick(0, false), // [param[0]] -> [param[0], param[0]]
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1062,11 +1012,11 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0, Hi: 0},
-				OperationPick{Depth: 1, IsTargetVector: true}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationV128Const(0, 0),
+				NewOperationPick(1, true), // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1082,13 +1032,13 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
+			expected: []UnionOperation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				OperationV128Const{Lo: 0x01, Hi: 0x02},
+				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
-				OperationSet{Depth: 3, IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				NewOperationSet(3, true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1102,11 +1052,11 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
-				OperationConstI32{Value: 0x1},
-				OperationSet{Depth: 1, IsTargetVector: false},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstI32(0x1),
+				NewOperationSet(1, false),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1125,14 +1075,14 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0, Hi: 0},
+			expected: []UnionOperation{
+				NewOperationV128Const(0, 0),
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				OperationV128Const{Lo: 0x01, Hi: 0x02},
+				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
-				OperationSet{Depth: 3, IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				NewOperationSet(3, true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1148,15 +1098,15 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
+			expected: []UnionOperation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				OperationV128Const{Lo: 0x01, Hi: 0x02},
+				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				OperationPick{Depth: 1, IsTargetVector: true},
+				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
-				OperationSet{Depth: 5, IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				NewOperationSet(5, true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1170,12 +1120,12 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
-				OperationConstF32{math.Float32frombits(1)},
-				OperationPick{Depth: 0, IsTargetVector: false},
-				OperationSet{Depth: 2, IsTargetVector: false},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+			expected: []UnionOperation{
+				NewOperationConstF32(math.Float32frombits(1)),
+				NewOperationPick(0, false),
+				NewOperationSet(2, false),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 		{
@@ -1194,16 +1144,16 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0, Hi: 0},
+			expected: []UnionOperation{
+				NewOperationV128Const(0, 0),
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				OperationV128Const{Lo: 0x01, Hi: 0x02},
+				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				OperationPick{Depth: 1, IsTargetVector: true},
+				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
-				OperationSet{Depth: 5, IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
+				NewOperationSet(5, true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
 	}
@@ -1211,10 +1161,13 @@ func TestCompile_Locals(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
-			require.Equal(t, tc.expected, res[0].Operations, msg)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(actual.Operations), Format(tc.expected))
+			require.Equal(t, tc.expected, actual.Operations, msg)
 		})
 	}
 }
@@ -1320,176 +1273,176 @@ func TestCompile_Vec(t *testing.T) {
 	tests := []struct {
 		name                 string
 		body                 []byte
-		expected             Operation
+		expected             UnionOperation
 		needDropBeforeReturn bool
 	}{
 		{
 			name:                 "i8x16 add",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI8x16Add),
-			expected:             OperationV128Add{Shape: ShapeI8x16},
+			expected:             NewOperationV128Add(ShapeI8x16),
 		},
 		{
 			name:                 "i8x16 add",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI16x8Add),
-			expected:             OperationV128Add{Shape: ShapeI16x8},
+			expected:             NewOperationV128Add(ShapeI16x8),
 		},
 		{
 			name:                 "i32x2 add",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI64x2Add),
-			expected:             OperationV128Add{Shape: ShapeI64x2},
+			expected:             NewOperationV128Add(ShapeI64x2),
 		},
 		{
 			name:                 "i64x2 add",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI64x2Add),
-			expected:             OperationV128Add{Shape: ShapeI64x2},
+			expected:             NewOperationV128Add(ShapeI64x2),
 		},
 		{
 			name:                 "i8x16 sub",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI8x16Sub),
-			expected:             OperationV128Sub{Shape: ShapeI8x16},
+			expected:             NewOperationV128Sub(ShapeI8x16),
 		},
 		{
 			name:                 "i16x8 sub",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI16x8Sub),
-			expected:             OperationV128Sub{Shape: ShapeI16x8},
+			expected:             NewOperationV128Sub(ShapeI16x8),
 		},
 		{
 			name:                 "i32x2 sub",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI64x2Sub),
-			expected:             OperationV128Sub{Shape: ShapeI64x2},
+			expected:             NewOperationV128Sub(ShapeI64x2),
 		},
 		{
 			name:                 "i64x2 sub",
 			needDropBeforeReturn: true,
 			body:                 vv2v(wasm.OpcodeVecI64x2Sub),
-			expected:             OperationV128Sub{Shape: ShapeI64x2},
+			expected:             NewOperationV128Sub(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecV128LoadName, body: load(wasm.OpcodeVecV128Load, 0, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType128, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType128, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128LoadName + "/align=4", body: load(wasm.OpcodeVecV128Load, 0, 4),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType128, Arg: MemoryArg{Alignment: 4, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType128, MemoryArg{Alignment: 4, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8x8SName, body: load(wasm.OpcodeVecV128Load8x8s, 1, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType8x8s, Arg: MemoryArg{Alignment: 0, Offset: 1}},
+			expected:             NewOperationV128Load(V128LoadType8x8s, MemoryArg{Alignment: 0, Offset: 1}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8x8SName + "/align=1", body: load(wasm.OpcodeVecV128Load8x8s, 0, 1),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType8x8s, Arg: MemoryArg{Alignment: 1, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType8x8s, MemoryArg{Alignment: 1, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8x8UName, body: load(wasm.OpcodeVecV128Load8x8u, 0, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType8x8u, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType8x8u, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8x8UName + "/align=1", body: load(wasm.OpcodeVecV128Load8x8u, 0, 1),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType8x8u, Arg: MemoryArg{Alignment: 1, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType8x8u, MemoryArg{Alignment: 1, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16x4SName, body: load(wasm.OpcodeVecV128Load16x4s, 1, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType16x4s, Arg: MemoryArg{Alignment: 0, Offset: 1}},
+			expected:             NewOperationV128Load(V128LoadType16x4s, MemoryArg{Alignment: 0, Offset: 1}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16x4SName + "/align=2", body: load(wasm.OpcodeVecV128Load16x4s, 0, 2),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType16x4s, Arg: MemoryArg{Alignment: 2, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType16x4s, MemoryArg{Alignment: 2, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16x4UName, body: load(wasm.OpcodeVecV128Load16x4u, 0, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType16x4u, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType16x4u, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16x4UName + "/align=2", body: load(wasm.OpcodeVecV128Load16x4u, 0, 2),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType16x4u, Arg: MemoryArg{Alignment: 2, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType16x4u, MemoryArg{Alignment: 2, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32x2SName, body: load(wasm.OpcodeVecV128Load32x2s, 1, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32x2s, Arg: MemoryArg{Alignment: 0, Offset: 1}},
+			expected:             NewOperationV128Load(V128LoadType32x2s, MemoryArg{Alignment: 0, Offset: 1}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32x2SName + "/align=3", body: load(wasm.OpcodeVecV128Load32x2s, 0, 3),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32x2s, Arg: MemoryArg{Alignment: 3, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType32x2s, MemoryArg{Alignment: 3, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32x2UName, body: load(wasm.OpcodeVecV128Load32x2u, 0, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32x2u, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType32x2u, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32x2UName + "/align=3", body: load(wasm.OpcodeVecV128Load32x2u, 0, 3),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32x2u, Arg: MemoryArg{Alignment: 3, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType32x2u, MemoryArg{Alignment: 3, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8SplatName, body: load(wasm.OpcodeVecV128Load8Splat, 2, 0),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType8Splat, Arg: MemoryArg{Alignment: 0, Offset: 2}},
+			expected:             NewOperationV128Load(V128LoadType8Splat, MemoryArg{Alignment: 0, Offset: 2}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16SplatName, body: load(wasm.OpcodeVecV128Load16Splat, 0, 1),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType16Splat, Arg: MemoryArg{Alignment: 1, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType16Splat, MemoryArg{Alignment: 1, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32SplatName, body: load(wasm.OpcodeVecV128Load32Splat, 3, 2),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32Splat, Arg: MemoryArg{Alignment: 2, Offset: 3}},
+			expected:             NewOperationV128Load(V128LoadType32Splat, MemoryArg{Alignment: 2, Offset: 3}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load64SplatName, body: load(wasm.OpcodeVecV128Load64Splat, 0, 3),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType64Splat, Arg: MemoryArg{Alignment: 3, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType64Splat, MemoryArg{Alignment: 3, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32zeroName, body: load(wasm.OpcodeVecV128Load32zero, 0, 2),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType32zero, Arg: MemoryArg{Alignment: 2, Offset: 0}},
+			expected:             NewOperationV128Load(V128LoadType32zero, MemoryArg{Alignment: 2, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load64zeroName, body: load(wasm.OpcodeVecV128Load64zero, 5, 3),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Load{Type: V128LoadType64zero, Arg: MemoryArg{Alignment: 3, Offset: 5}},
+			expected:             NewOperationV128Load(V128LoadType64zero, MemoryArg{Alignment: 3, Offset: 5}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load8LaneName, needDropBeforeReturn: true,
 			body:     loadLane(wasm.OpcodeVecV128Load8Lane, 5, 0, 10),
-			expected: OperationV128LoadLane{LaneIndex: 10, LaneSize: 8, Arg: MemoryArg{Alignment: 0, Offset: 5}},
+			expected: NewOperationV128LoadLane(10, 8, MemoryArg{Alignment: 0, Offset: 5}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load16LaneName, needDropBeforeReturn: true,
 			body:     loadLane(wasm.OpcodeVecV128Load16Lane, 100, 1, 7),
-			expected: OperationV128LoadLane{LaneIndex: 7, LaneSize: 16, Arg: MemoryArg{Alignment: 1, Offset: 100}},
+			expected: NewOperationV128LoadLane(7, 16, MemoryArg{Alignment: 1, Offset: 100}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load32LaneName, needDropBeforeReturn: true,
 			body:     loadLane(wasm.OpcodeVecV128Load32Lane, 0, 2, 3),
-			expected: OperationV128LoadLane{LaneIndex: 3, LaneSize: 32, Arg: MemoryArg{Alignment: 2, Offset: 0}},
+			expected: NewOperationV128LoadLane(3, 32, MemoryArg{Alignment: 2, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128Load64LaneName, needDropBeforeReturn: true,
 			body:     loadLane(wasm.OpcodeVecV128Load64Lane, 0, 3, 1),
-			expected: OperationV128LoadLane{LaneIndex: 1, LaneSize: 64, Arg: MemoryArg{Alignment: 3, Offset: 0}},
+			expected: NewOperationV128LoadLane(1, 64, MemoryArg{Alignment: 3, Offset: 0}),
 		},
 		{
 			name: wasm.OpcodeVecV128StoreName, body: []byte{
@@ -1505,250 +1458,250 @@ func TestCompile_Vec(t *testing.T) {
 				10, // offset
 				wasm.OpcodeEnd,
 			},
-			expected: OperationV128Store{Arg: MemoryArg{Alignment: 4, Offset: 10}},
+			expected: NewOperationV128Store(MemoryArg{Alignment: 4, Offset: 10}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store8LaneName,
 			body:     storeLane(wasm.OpcodeVecV128Store8Lane, 0, 0, 0),
-			expected: OperationV128StoreLane{LaneIndex: 0, LaneSize: 8, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected: NewOperationV128StoreLane(0, 8, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store8LaneName + "/lane=15",
 			body:     storeLane(wasm.OpcodeVecV128Store8Lane, 100, 0, 15),
-			expected: OperationV128StoreLane{LaneIndex: 15, LaneSize: 8, Arg: MemoryArg{Alignment: 0, Offset: 100}},
+			expected: NewOperationV128StoreLane(15, 8, MemoryArg{Alignment: 0, Offset: 100}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store16LaneName,
 			body:     storeLane(wasm.OpcodeVecV128Store16Lane, 0, 0, 0),
-			expected: OperationV128StoreLane{LaneIndex: 0, LaneSize: 16, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected: NewOperationV128StoreLane(0, 16, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store16LaneName + "/lane=7/align=1",
 			body:     storeLane(wasm.OpcodeVecV128Store16Lane, 100, 1, 7),
-			expected: OperationV128StoreLane{LaneIndex: 7, LaneSize: 16, Arg: MemoryArg{Alignment: 1, Offset: 100}},
+			expected: NewOperationV128StoreLane(7, 16, MemoryArg{Alignment: 1, Offset: 100}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store32LaneName,
 			body:     storeLane(wasm.OpcodeVecV128Store32Lane, 0, 0, 0),
-			expected: OperationV128StoreLane{LaneIndex: 0, LaneSize: 32, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected: NewOperationV128StoreLane(0, 32, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store32LaneName + "/lane=3/align=2",
 			body:     storeLane(wasm.OpcodeVecV128Store32Lane, 100, 2, 3),
-			expected: OperationV128StoreLane{LaneIndex: 3, LaneSize: 32, Arg: MemoryArg{Alignment: 2, Offset: 100}},
+			expected: NewOperationV128StoreLane(3, 32, MemoryArg{Alignment: 2, Offset: 100}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store64LaneName,
 			body:     storeLane(wasm.OpcodeVecV128Store64Lane, 0, 0, 0),
-			expected: OperationV128StoreLane{LaneIndex: 0, LaneSize: 64, Arg: MemoryArg{Alignment: 0, Offset: 0}},
+			expected: NewOperationV128StoreLane(0, 64, MemoryArg{Alignment: 0, Offset: 0}),
 		},
 		{
 			name:     wasm.OpcodeVecV128Store64LaneName + "/lane=1/align=3",
 			body:     storeLane(wasm.OpcodeVecV128Store64Lane, 50, 3, 1),
-			expected: OperationV128StoreLane{LaneIndex: 1, LaneSize: 64, Arg: MemoryArg{Alignment: 3, Offset: 50}},
+			expected: NewOperationV128StoreLane(1, 64, MemoryArg{Alignment: 3, Offset: 50}),
 		},
 		{
 			name:                 wasm.OpcodeVecI8x16ExtractLaneSName,
 			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneS, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Signed: true, Shape: ShapeI8x16},
+			expected:             NewOperationV128ExtractLane(0, true, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI8x16ExtractLaneSName + "/lane=15",
 			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneS, 15),
-			expected:             OperationV128ExtractLane{LaneIndex: 15, Signed: true, Shape: ShapeI8x16},
+			expected:             NewOperationV128ExtractLane(15, true, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI8x16ExtractLaneUName,
 			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneU, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Signed: false, Shape: ShapeI8x16},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI8x16ExtractLaneUName + "/lane=15",
 			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneU, 15),
-			expected:             OperationV128ExtractLane{LaneIndex: 15, Signed: false, Shape: ShapeI8x16},
+			expected:             NewOperationV128ExtractLane(15, false, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ExtractLaneSName,
 			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneS, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Signed: true, Shape: ShapeI16x8},
+			expected:             NewOperationV128ExtractLane(0, true, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ExtractLaneSName + "/lane=7",
 			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneS, 7),
-			expected:             OperationV128ExtractLane{LaneIndex: 7, Signed: true, Shape: ShapeI16x8},
+			expected:             NewOperationV128ExtractLane(7, true, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ExtractLaneUName,
 			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneU, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Signed: false, Shape: ShapeI16x8},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ExtractLaneUName + "/lane=7",
 			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneU, 7),
-			expected:             OperationV128ExtractLane{LaneIndex: 7, Signed: false, Shape: ShapeI16x8},
+			expected:             NewOperationV128ExtractLane(7, false, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI32x4ExtractLaneName,
 			body:                 extractLane(wasm.OpcodeVecI32x4ExtractLane, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeI32x4},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeI32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI32x4ExtractLaneName + "/lane=3",
 			body:                 extractLane(wasm.OpcodeVecI32x4ExtractLane, 3),
-			expected:             OperationV128ExtractLane{LaneIndex: 3, Shape: ShapeI32x4},
+			expected:             NewOperationV128ExtractLane(3, false, ShapeI32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI64x2ExtractLaneName,
 			body:                 extractLane(wasm.OpcodeVecI64x2ExtractLane, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeI64x2},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeI64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI64x2ExtractLaneName + "/lane=1",
 			body:                 extractLane(wasm.OpcodeVecI64x2ExtractLane, 1),
-			expected:             OperationV128ExtractLane{LaneIndex: 1, Shape: ShapeI64x2},
+			expected:             NewOperationV128ExtractLane(1, false, ShapeI64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF32x4ExtractLaneName,
 			body:                 extractLane(wasm.OpcodeVecF32x4ExtractLane, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeF32x4},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeF32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF32x4ExtractLaneName + "/lane=3",
 			body:                 extractLane(wasm.OpcodeVecF32x4ExtractLane, 3),
-			expected:             OperationV128ExtractLane{LaneIndex: 3, Shape: ShapeF32x4},
+			expected:             NewOperationV128ExtractLane(3, false, ShapeF32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF64x2ExtractLaneName,
 			body:                 extractLane(wasm.OpcodeVecF64x2ExtractLane, 0),
-			expected:             OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeF64x2},
+			expected:             NewOperationV128ExtractLane(0, false, ShapeF64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF64x2ExtractLaneName + "/lane=1",
 			body:                 extractLane(wasm.OpcodeVecF64x2ExtractLane, 1),
-			expected:             OperationV128ExtractLane{LaneIndex: 1, Shape: ShapeF64x2},
+			expected:             NewOperationV128ExtractLane(1, false, ShapeF64x2),
 			needDropBeforeReturn: true,
 		},
 
 		{
 			name:                 wasm.OpcodeVecI8x16ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecI8x16ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI8x16},
+			expected:             NewOperationV128ReplaceLane(0, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI8x16ReplaceLaneName + "/lane=15",
 			body:                 replaceLane(wasm.OpcodeVecI8x16ReplaceLane, 15),
-			expected:             OperationV128ReplaceLane{LaneIndex: 15, Shape: ShapeI8x16},
+			expected:             NewOperationV128ReplaceLane(15, ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecI16x8ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI16x8},
+			expected:             NewOperationV128ReplaceLane(0, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI16x8ReplaceLaneName + "/lane=7",
 			body:                 replaceLane(wasm.OpcodeVecI16x8ReplaceLane, 7),
-			expected:             OperationV128ReplaceLane{LaneIndex: 7, Shape: ShapeI16x8},
+			expected:             NewOperationV128ReplaceLane(7, ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI32x4ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecI32x4ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI32x4},
+			expected:             NewOperationV128ReplaceLane(0, ShapeI32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI32x4ReplaceLaneName + "/lane=3",
 			body:                 replaceLane(wasm.OpcodeVecI32x4ReplaceLane, 3),
-			expected:             OperationV128ReplaceLane{LaneIndex: 3, Shape: ShapeI32x4},
+			expected:             NewOperationV128ReplaceLane(3, ShapeI32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI64x2ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecI64x2ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI64x2},
+			expected:             NewOperationV128ReplaceLane(0, ShapeI64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecI64x2ReplaceLaneName + "/lane=1",
 			body:                 replaceLane(wasm.OpcodeVecI64x2ReplaceLane, 1),
-			expected:             OperationV128ReplaceLane{LaneIndex: 1, Shape: ShapeI64x2},
+			expected:             NewOperationV128ReplaceLane(1, ShapeI64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF32x4ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecF32x4ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeF32x4},
+			expected:             NewOperationV128ReplaceLane(0, ShapeF32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF32x4ReplaceLaneName + "/lane=3",
 			body:                 replaceLane(wasm.OpcodeVecF32x4ReplaceLane, 3),
-			expected:             OperationV128ReplaceLane{LaneIndex: 3, Shape: ShapeF32x4},
+			expected:             NewOperationV128ReplaceLane(3, ShapeF32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF64x2ReplaceLaneName,
 			body:                 replaceLane(wasm.OpcodeVecF64x2ReplaceLane, 0),
-			expected:             OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeF64x2},
+			expected:             NewOperationV128ReplaceLane(0, ShapeF64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name:                 wasm.OpcodeVecF64x2ReplaceLaneName + "/lane=1",
 			body:                 replaceLane(wasm.OpcodeVecF64x2ReplaceLane, 1),
-			expected:             OperationV128ReplaceLane{LaneIndex: 1, Shape: ShapeF64x2},
+			expected:             NewOperationV128ReplaceLane(1, ShapeF64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecI8x16SplatName, body: splat(wasm.OpcodeVecI8x16Splat),
-			expected:             OperationV128Splat{Shape: ShapeI8x16},
+			expected:             NewOperationV128Splat(ShapeI8x16),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecI16x8SplatName, body: splat(wasm.OpcodeVecI16x8Splat),
-			expected:             OperationV128Splat{Shape: ShapeI16x8},
+			expected:             NewOperationV128Splat(ShapeI16x8),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecI32x4SplatName, body: splat(wasm.OpcodeVecI32x4Splat),
-			expected:             OperationV128Splat{Shape: ShapeI32x4},
+			expected:             NewOperationV128Splat(ShapeI32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecI64x2SplatName, body: splat(wasm.OpcodeVecI64x2Splat),
-			expected:             OperationV128Splat{Shape: ShapeI64x2},
+			expected:             NewOperationV128Splat(ShapeI64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecF32x4SplatName, body: splat(wasm.OpcodeVecF32x4Splat),
-			expected:             OperationV128Splat{Shape: ShapeF32x4},
+			expected:             NewOperationV128Splat(ShapeF32x4),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecF64x2SplatName, body: splat(wasm.OpcodeVecF64x2Splat),
-			expected:             OperationV128Splat{Shape: ShapeF64x2},
+			expected:             NewOperationV128Splat(ShapeF64x2),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecI8x16SwizzleName, body: vv2v(wasm.OpcodeVecI8x16Swizzle),
-			expected:             OperationV128Swizzle{},
+			expected:             NewOperationV128Swizzle(),
 			needDropBeforeReturn: true,
 		},
 		{
@@ -1763,1018 +1716,922 @@ func TestCompile_Vec(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: OperationV128Shuffle{Lanes: [16]byte{
+			expected: NewOperationV128Shuffle([]uint64{
 				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-			}},
+			}),
 			needDropBeforeReturn: true,
 		},
 		{
 			name: wasm.OpcodeVecV128NotName, body: v2v(wasm.OpcodeVecV128Not),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Not{},
+			expected:             NewOperationV128Not(),
 		},
 		{
 			name: wasm.OpcodeVecV128AndName, body: vv2v(wasm.OpcodeVecV128And),
 			needDropBeforeReturn: true,
-			expected:             OperationV128And{},
+			expected:             NewOperationV128And(),
 		},
 		{
 			name: wasm.OpcodeVecV128AndNotName, body: vv2v(wasm.OpcodeVecV128AndNot),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AndNot{},
+			expected:             NewOperationV128AndNot(),
 		},
 		{
 			name: wasm.OpcodeVecV128OrName, body: vv2v(wasm.OpcodeVecV128Or),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Or{},
+			expected:             NewOperationV128Or(),
 		},
 		{
 			name: wasm.OpcodeVecV128XorName, body: vv2v(wasm.OpcodeVecV128Xor),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Xor{},
+			expected:             NewOperationV128Xor(),
 		},
 		{
 			name: wasm.OpcodeVecV128BitselectName, body: vvv2v(wasm.OpcodeVecV128Bitselect),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Bitselect{},
+			expected:             NewOperationV128Bitselect(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16ShlName, body: vi2v(wasm.OpcodeVecI8x16Shl),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shl{Shape: ShapeI8x16},
+			expected:             NewOperationV128Shl(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI8x16ShrSName, body: vi2v(wasm.OpcodeVecI8x16ShrS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128Shr(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16ShrUName, body: vi2v(wasm.OpcodeVecI8x16ShrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI8x16, Signed: false},
+			expected:             NewOperationV128Shr(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ShlName, body: vi2v(wasm.OpcodeVecI16x8Shl),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shl{Shape: ShapeI16x8},
+			expected:             NewOperationV128Shl(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ShrSName, body: vi2v(wasm.OpcodeVecI16x8ShrS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Shr(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ShrUName, body: vi2v(wasm.OpcodeVecI16x8ShrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128Shr(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ShlName, body: vi2v(wasm.OpcodeVecI32x4Shl),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shl{Shape: ShapeI32x4},
+			expected:             NewOperationV128Shl(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ShrSName, body: vi2v(wasm.OpcodeVecI32x4ShrS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Shr(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ShrUName, body: vi2v(wasm.OpcodeVecI32x4ShrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI32x4, Signed: false},
+			expected:             NewOperationV128Shr(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ShlName, body: vi2v(wasm.OpcodeVecI64x2Shl),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shl{Shape: ShapeI64x2},
+			expected:             NewOperationV128Shl(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ShrSName, body: vi2v(wasm.OpcodeVecI64x2ShrS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI64x2, Signed: true},
+			expected:             NewOperationV128Shr(ShapeI64x2, true),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ShrUName, body: vi2v(wasm.OpcodeVecI64x2ShrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Shr{Shape: ShapeI64x2, Signed: false},
+			expected:             NewOperationV128Shr(ShapeI64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16EqName, body: vv2v(wasm.OpcodeVecI8x16Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16Eq),
 		},
 		{
 			name: wasm.OpcodeVecI8x16NeName, body: vv2v(wasm.OpcodeVecI8x16Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16Ne),
 		},
 		{
 			name: wasm.OpcodeVecI8x16LtSName, body: vv2v(wasm.OpcodeVecI8x16LtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16LtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16LtS),
 		},
 		{
 			name: wasm.OpcodeVecI8x16LtUName, body: vv2v(wasm.OpcodeVecI8x16LtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16LtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16LtU),
 		},
 		{
 			name: wasm.OpcodeVecI8x16GtSName, body: vv2v(wasm.OpcodeVecI8x16GtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16GtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16GtS),
 		},
 		{
 			name: wasm.OpcodeVecI8x16GtUName, body: vv2v(wasm.OpcodeVecI8x16GtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16GtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16GtU),
 		},
 		{
 			name: wasm.OpcodeVecI8x16LeSName, body: vv2v(wasm.OpcodeVecI8x16LeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16LeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16LeS),
 		},
 		{
 			name: wasm.OpcodeVecI8x16LeUName, body: vv2v(wasm.OpcodeVecI8x16LeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16LeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16LeU),
 		},
 		{
 			name: wasm.OpcodeVecI8x16GeSName, body: vv2v(wasm.OpcodeVecI8x16GeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16GeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16GeS),
 		},
 		{
 			name: wasm.OpcodeVecI8x16GeUName, body: vv2v(wasm.OpcodeVecI8x16GeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI8x16GeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI8x16GeU),
 		},
 		{
 			name: wasm.OpcodeVecI16x8EqName, body: vv2v(wasm.OpcodeVecI16x8Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8Eq),
 		},
 		{
 			name: wasm.OpcodeVecI16x8NeName, body: vv2v(wasm.OpcodeVecI16x8Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8Ne),
 		},
 		{
 			name: wasm.OpcodeVecI16x8LtSName, body: vv2v(wasm.OpcodeVecI16x8LtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8LtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8LtS),
 		},
 		{
 			name: wasm.OpcodeVecI16x8LtUName, body: vv2v(wasm.OpcodeVecI16x8LtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8LtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8LtU),
 		},
 		{
 			name: wasm.OpcodeVecI16x8GtSName, body: vv2v(wasm.OpcodeVecI16x8GtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8GtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8GtS),
 		},
 		{
 			name: wasm.OpcodeVecI16x8GtUName, body: vv2v(wasm.OpcodeVecI16x8GtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8GtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8GtU),
 		},
 		{
 			name: wasm.OpcodeVecI16x8LeSName, body: vv2v(wasm.OpcodeVecI16x8LeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8LeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8LeS),
 		},
 		{
 			name: wasm.OpcodeVecI16x8LeUName, body: vv2v(wasm.OpcodeVecI16x8LeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8LeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8LeU),
 		},
 		{
 			name: wasm.OpcodeVecI16x8GeSName, body: vv2v(wasm.OpcodeVecI16x8GeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8GeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8GeS),
 		},
 		{
 			name: wasm.OpcodeVecI16x8GeUName, body: vv2v(wasm.OpcodeVecI16x8GeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI16x8GeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI16x8GeU),
 		},
 		{
 			name: wasm.OpcodeVecI32x4EqName, body: vv2v(wasm.OpcodeVecI32x4Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4Eq),
 		},
 		{
 			name: wasm.OpcodeVecI32x4NeName, body: vv2v(wasm.OpcodeVecI32x4Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4Ne),
 		},
 		{
 			name: wasm.OpcodeVecI32x4LtSName, body: vv2v(wasm.OpcodeVecI32x4LtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4LtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4LtS),
 		},
 		{
 			name: wasm.OpcodeVecI32x4LtUName, body: vv2v(wasm.OpcodeVecI32x4LtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4LtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4LtU),
 		},
 		{
 			name: wasm.OpcodeVecI32x4GtSName, body: vv2v(wasm.OpcodeVecI32x4GtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4GtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4GtS),
 		},
 		{
 			name: wasm.OpcodeVecI32x4GtUName, body: vv2v(wasm.OpcodeVecI32x4GtU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4GtU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4GtU),
 		},
 		{
 			name: wasm.OpcodeVecI32x4LeSName, body: vv2v(wasm.OpcodeVecI32x4LeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4LeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4LeS),
 		},
 		{
 			name: wasm.OpcodeVecI32x4LeUName, body: vv2v(wasm.OpcodeVecI32x4LeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4LeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4LeU),
 		},
 		{
 			name: wasm.OpcodeVecI32x4GeSName, body: vv2v(wasm.OpcodeVecI32x4GeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4GeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4GeS),
 		},
 		{
 			name: wasm.OpcodeVecI32x4GeUName, body: vv2v(wasm.OpcodeVecI32x4GeU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI32x4GeU},
+			expected:             NewOperationV128Cmp(V128CmpTypeI32x4GeU),
 		},
 		{
 			name: wasm.OpcodeVecI64x2EqName, body: vv2v(wasm.OpcodeVecI64x2Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2Eq),
 		},
 		{
 			name: wasm.OpcodeVecI64x2NeName, body: vv2v(wasm.OpcodeVecI64x2Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2Ne),
 		},
 		{
 			name: wasm.OpcodeVecI64x2LtSName, body: vv2v(wasm.OpcodeVecI64x2LtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2LtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2LtS),
 		},
 		{
 			name: wasm.OpcodeVecI64x2GtSName, body: vv2v(wasm.OpcodeVecI64x2GtS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2GtS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2GtS),
 		},
 		{
 			name: wasm.OpcodeVecI64x2LeSName, body: vv2v(wasm.OpcodeVecI64x2LeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2LeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2LeS),
 		},
 		{
 			name: wasm.OpcodeVecI64x2GeSName, body: vv2v(wasm.OpcodeVecI64x2GeS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeI64x2GeS},
+			expected:             NewOperationV128Cmp(V128CmpTypeI64x2GeS),
 		},
 		{
 			name: wasm.OpcodeVecF32x4EqName, body: vv2v(wasm.OpcodeVecF32x4Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Eq),
 		},
 		{
 			name: wasm.OpcodeVecF32x4NeName, body: vv2v(wasm.OpcodeVecF32x4Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Ne),
 		},
 		{
 			name: wasm.OpcodeVecF32x4LtName, body: vv2v(wasm.OpcodeVecF32x4Lt),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Lt},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Lt),
 		},
 		{
 			name: wasm.OpcodeVecF32x4GtName, body: vv2v(wasm.OpcodeVecF32x4Gt),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Gt},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Gt),
 		},
 		{
 			name: wasm.OpcodeVecF32x4LeName, body: vv2v(wasm.OpcodeVecF32x4Le),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Le},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Le),
 		},
 		{
 			name: wasm.OpcodeVecF32x4GeName, body: vv2v(wasm.OpcodeVecF32x4Ge),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF32x4Ge},
+			expected:             NewOperationV128Cmp(V128CmpTypeF32x4Ge),
 		},
 		{
 			name: wasm.OpcodeVecF64x2EqName, body: vv2v(wasm.OpcodeVecF64x2Eq),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Eq},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Eq),
 		},
 		{
 			name: wasm.OpcodeVecF64x2NeName, body: vv2v(wasm.OpcodeVecF64x2Ne),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Ne},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Ne),
 		},
 		{
 			name: wasm.OpcodeVecF64x2LtName, body: vv2v(wasm.OpcodeVecF64x2Lt),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Lt},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Lt),
 		},
 		{
 			name: wasm.OpcodeVecF64x2GtName, body: vv2v(wasm.OpcodeVecF64x2Gt),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Gt},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Gt),
 		},
 		{
 			name: wasm.OpcodeVecF64x2LeName, body: vv2v(wasm.OpcodeVecF64x2Le),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Le},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Le),
 		},
 		{
 			name: wasm.OpcodeVecF64x2GeName, body: vv2v(wasm.OpcodeVecF64x2Ge),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Cmp{Type: V128CmpTypeF64x2Ge},
+			expected:             NewOperationV128Cmp(V128CmpTypeF64x2Ge),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AllTrueName, body: v2v(wasm.OpcodeVecI8x16AllTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AllTrue{Shape: ShapeI8x16},
+			expected:             NewOperationV128AllTrue(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AllTrueName, body: v2v(wasm.OpcodeVecI16x8AllTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AllTrue{Shape: ShapeI16x8},
+			expected:             NewOperationV128AllTrue(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI32x4AllTrueName, body: v2v(wasm.OpcodeVecI32x4AllTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AllTrue{Shape: ShapeI32x4},
+			expected:             NewOperationV128AllTrue(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI64x2AllTrueName, body: v2v(wasm.OpcodeVecI64x2AllTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AllTrue{Shape: ShapeI64x2},
+			expected:             NewOperationV128AllTrue(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecI8x16BitMaskName, body: v2v(wasm.OpcodeVecI8x16BitMask),
-			needDropBeforeReturn: true, expected: OperationV128BitMask{Shape: ShapeI8x16},
+			needDropBeforeReturn: true, expected: NewOperationV128BitMask(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI16x8BitMaskName, body: v2v(wasm.OpcodeVecI16x8BitMask),
-			needDropBeforeReturn: true, expected: OperationV128BitMask{Shape: ShapeI16x8},
+			needDropBeforeReturn: true, expected: NewOperationV128BitMask(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI32x4BitMaskName, body: v2v(wasm.OpcodeVecI32x4BitMask),
-			needDropBeforeReturn: true, expected: OperationV128BitMask{Shape: ShapeI32x4},
+			needDropBeforeReturn: true, expected: NewOperationV128BitMask(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI64x2BitMaskName, body: v2v(wasm.OpcodeVecI64x2BitMask),
-			needDropBeforeReturn: true, expected: OperationV128BitMask{Shape: ShapeI64x2},
+			needDropBeforeReturn: true, expected: NewOperationV128BitMask(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecV128AnyTrueName, body: v2v(wasm.OpcodeVecV128AnyTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AnyTrue{},
+			expected:             NewOperationV128AnyTrue(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AddName, body: vv2v(wasm.OpcodeVecI8x16Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeI8x16},
+			expected:             NewOperationV128Add(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AddSatSName, body: vv2v(wasm.OpcodeVecI8x16AddSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AddSat{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128AddSat(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AddSatUName, body: vv2v(wasm.OpcodeVecI8x16AddSatU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AddSat{Shape: ShapeI8x16, Signed: false},
+			expected:             NewOperationV128AddSat(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16SubName, body: vv2v(wasm.OpcodeVecI8x16Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeI8x16},
+			expected:             NewOperationV128Sub(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI8x16SubSatSName, body: vv2v(wasm.OpcodeVecI8x16SubSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128SubSat{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128SubSat(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16SubSatUName, body: vv2v(wasm.OpcodeVecI8x16SubSatU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128SubSat{Shape: ShapeI8x16, Signed: false},
+			expected:             NewOperationV128SubSat(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AddName, body: vv2v(wasm.OpcodeVecI16x8Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeI16x8},
+			expected:             NewOperationV128Add(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AddSatSName, body: vv2v(wasm.OpcodeVecI16x8AddSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AddSat{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128AddSat(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AddSatUName, body: vv2v(wasm.OpcodeVecI16x8AddSatU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AddSat{Shape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128AddSat(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8SubName, body: vv2v(wasm.OpcodeVecI16x8Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeI16x8},
+			expected:             NewOperationV128Sub(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI16x8SubSatSName, body: vv2v(wasm.OpcodeVecI16x8SubSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128SubSat{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128SubSat(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8SubSatUName, body: vv2v(wasm.OpcodeVecI16x8SubSatU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128SubSat{Shape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128SubSat(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MulName, body: vv2v(wasm.OpcodeVecI16x8Mul),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Mul{Shape: ShapeI16x8},
+			expected:             NewOperationV128Mul(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI32x4AddName, body: vv2v(wasm.OpcodeVecI32x4Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeI32x4},
+			expected:             NewOperationV128Add(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI32x4SubName, body: vv2v(wasm.OpcodeVecI32x4Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeI32x4},
+			expected:             NewOperationV128Sub(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MulName, body: vv2v(wasm.OpcodeVecI32x4Mul),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Mul{Shape: ShapeI32x4},
+			expected:             NewOperationV128Mul(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI64x2AddName, body: vv2v(wasm.OpcodeVecI64x2Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeI64x2},
+			expected:             NewOperationV128Add(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecI64x2SubName, body: vv2v(wasm.OpcodeVecI64x2Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeI64x2},
+			expected:             NewOperationV128Sub(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecI64x2MulName, body: vv2v(wasm.OpcodeVecI64x2Mul),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Mul{Shape: ShapeI64x2},
+			expected:             NewOperationV128Mul(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecF32x4AddName, body: vv2v(wasm.OpcodeVecF32x4Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeF32x4},
+			expected:             NewOperationV128Add(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4SubName, body: vv2v(wasm.OpcodeVecF32x4Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeF32x4},
+			expected:             NewOperationV128Sub(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4MulName, body: vv2v(wasm.OpcodeVecF32x4Mul),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Mul{Shape: ShapeF32x4},
+			expected:             NewOperationV128Mul(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4DivName, body: vv2v(wasm.OpcodeVecF32x4Div),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Div{Shape: ShapeF32x4},
+			expected:             NewOperationV128Div(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF64x2AddName, body: vv2v(wasm.OpcodeVecF64x2Add),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Add{Shape: ShapeF64x2},
+			expected:             NewOperationV128Add(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2SubName, body: vv2v(wasm.OpcodeVecF64x2Sub),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Sub{Shape: ShapeF64x2},
+			expected:             NewOperationV128Sub(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2MulName, body: vv2v(wasm.OpcodeVecF64x2Mul),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Mul{Shape: ShapeF64x2},
+			expected:             NewOperationV128Mul(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2DivName, body: vv2v(wasm.OpcodeVecF64x2Div),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Div{Shape: ShapeF64x2},
+			expected:             NewOperationV128Div(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MinSName, body: vv2v(wasm.OpcodeVecI8x16MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128Min(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MinUName, body: vv2v(wasm.OpcodeVecI8x16MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI8x16},
+			expected:             NewOperationV128Min(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MaxSName, body: vv2v(wasm.OpcodeVecI8x16MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128Max(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MaxUName, body: vv2v(wasm.OpcodeVecI8x16MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI8x16},
+			expected:             NewOperationV128Max(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AvgrUName, body: vv2v(wasm.OpcodeVecI8x16AvgrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AvgrU{Shape: ShapeI8x16},
+			expected:             NewOperationV128AvgrU(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MinSName, body: vv2v(wasm.OpcodeVecI16x8MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Min(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MinUName, body: vv2v(wasm.OpcodeVecI16x8MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI16x8},
+			expected:             NewOperationV128Min(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MaxSName, body: vv2v(wasm.OpcodeVecI16x8MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Max(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MaxUName, body: vv2v(wasm.OpcodeVecI16x8MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI16x8},
+			expected:             NewOperationV128Max(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AvgrUName, body: vv2v(wasm.OpcodeVecI16x8AvgrU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AvgrU{Shape: ShapeI16x8},
+			expected:             NewOperationV128AvgrU(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MinSName, body: vv2v(wasm.OpcodeVecI32x4MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Min(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MinUName, body: vv2v(wasm.OpcodeVecI32x4MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI32x4},
+			expected:             NewOperationV128Min(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MaxSName, body: vv2v(wasm.OpcodeVecI32x4MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Max(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MaxUName, body: vv2v(wasm.OpcodeVecI32x4MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI32x4},
+			expected:             NewOperationV128Max(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF32x4MinName, body: vv2v(wasm.OpcodeVecF32x4Min),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeF32x4},
+			expected:             NewOperationV128Min(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF32x4MaxName, body: vv2v(wasm.OpcodeVecF32x4Max),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeF32x4},
+			expected:             NewOperationV128Max(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2MinName, body: vv2v(wasm.OpcodeVecF64x2Min),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeF64x2},
+			expected:             NewOperationV128Min(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2MaxName, body: vv2v(wasm.OpcodeVecF64x2Max),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeF64x2},
+			expected:             NewOperationV128Max(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AbsName, body: v2v(wasm.OpcodeVecI8x16Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeI8x16},
+			expected:             NewOperationV128Abs(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI8x16PopcntName, body: v2v(wasm.OpcodeVecI8x16Popcnt),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Popcnt{},
+			expected:             NewOperationV128Popcnt(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AbsName, body: v2v(wasm.OpcodeVecI16x8Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeI16x8},
+			expected:             NewOperationV128Abs(ShapeI16x8),
 		},
 		{
 			name: wasm.OpcodeVecI32x4AbsName, body: v2v(wasm.OpcodeVecI32x4Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeI32x4},
+			expected:             NewOperationV128Abs(ShapeI32x4),
 		},
 		{
 			name: wasm.OpcodeVecI64x2AbsName, body: v2v(wasm.OpcodeVecI64x2Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeI64x2},
+			expected:             NewOperationV128Abs(ShapeI64x2),
 		},
 		{
 			name: wasm.OpcodeVecF32x4AbsName, body: v2v(wasm.OpcodeVecF32x4Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeF32x4},
+			expected:             NewOperationV128Abs(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF64x2AbsName, body: v2v(wasm.OpcodeVecF64x2Abs),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Abs{Shape: ShapeF64x2},
+			expected:             NewOperationV128Abs(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF32x4CeilName, body: v2v(wasm.OpcodeVecF32x4Ceil),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Ceil{Shape: ShapeF32x4},
+			expected:             NewOperationV128Ceil(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4FloorName, body: v2v(wasm.OpcodeVecF32x4Floor),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Floor{Shape: ShapeF32x4},
+			expected:             NewOperationV128Floor(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4TruncName, body: v2v(wasm.OpcodeVecF32x4Trunc),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Trunc{Shape: ShapeF32x4},
+			expected:             NewOperationV128Trunc(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4NearestName, body: v2v(wasm.OpcodeVecF32x4Nearest),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Nearest{Shape: ShapeF32x4},
+			expected:             NewOperationV128Nearest(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF64x2CeilName, body: v2v(wasm.OpcodeVecF64x2Ceil),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Ceil{Shape: ShapeF64x2},
+			expected:             NewOperationV128Ceil(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2FloorName, body: v2v(wasm.OpcodeVecF64x2Floor),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Floor{Shape: ShapeF64x2},
+			expected:             NewOperationV128Floor(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2TruncName, body: v2v(wasm.OpcodeVecF64x2Trunc),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Trunc{Shape: ShapeF64x2},
+			expected:             NewOperationV128Trunc(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2NearestName, body: v2v(wasm.OpcodeVecF64x2Nearest),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Nearest{Shape: ShapeF64x2},
+			expected:             NewOperationV128Nearest(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF32x4PminName, body: vv2v(wasm.OpcodeVecF32x4Pmin),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Pmin{Shape: ShapeF32x4},
+			expected:             NewOperationV128Pmin(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF32x4PmaxName, body: vv2v(wasm.OpcodeVecF32x4Pmax),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Pmax{Shape: ShapeF32x4},
+			expected:             NewOperationV128Pmax(ShapeF32x4),
 		},
 		{
 			name: wasm.OpcodeVecF64x2PminName, body: vv2v(wasm.OpcodeVecF64x2Pmin),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Pmin{Shape: ShapeF64x2},
+			expected:             NewOperationV128Pmin(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecF64x2PmaxName, body: vv2v(wasm.OpcodeVecF64x2Pmax),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Pmax{Shape: ShapeF64x2},
+			expected:             NewOperationV128Pmax(ShapeF64x2),
 		},
 		{
 			name: wasm.OpcodeVecI16x8Q15mulrSatSName, body: vv2v(wasm.OpcodeVecI16x8Q15mulrSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Q15mulrSatS{},
+			expected:             NewOperationV128Q15mulrSatS(),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtMulLowI8x16SName, body: vv2v(wasm.OpcodeVecI16x8ExtMulLowI8x16S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI8x16,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI8x16, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtMulHighI8x16SName, body: vv2v(wasm.OpcodeVecI16x8ExtMulHighI8x16S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI8x16,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI8x16, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtMulLowI8x16UName, body: vv2v(wasm.OpcodeVecI16x8ExtMulLowI8x16U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI8x16,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI8x16, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtMulHighI8x16UName, body: vv2v(wasm.OpcodeVecI16x8ExtMulHighI8x16U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI8x16,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI8x16, false, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtMulLowI16x8SName, body: vv2v(wasm.OpcodeVecI32x4ExtMulLowI16x8S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI16x8,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI16x8, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtMulHighI16x8SName, body: vv2v(wasm.OpcodeVecI32x4ExtMulHighI16x8S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI16x8,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI16x8, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtMulLowI16x8UName, body: vv2v(wasm.OpcodeVecI32x4ExtMulLowI16x8U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI16x8,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI16x8, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtMulHighI16x8UName, body: vv2v(wasm.OpcodeVecI32x4ExtMulHighI16x8U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI16x8,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI16x8, false, false),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtMulLowI32x4SName, body: vv2v(wasm.OpcodeVecI64x2ExtMulLowI32x4S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI32x4,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI32x4, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtMulHighI32x4SName, body: vv2v(wasm.OpcodeVecI64x2ExtMulHighI32x4S),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI32x4,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI32x4, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtMulLowI32x4UName, body: vv2v(wasm.OpcodeVecI64x2ExtMulLowI32x4U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI32x4,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI32x4, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtMulHighI32x4UName, body: vv2v(wasm.OpcodeVecI64x2ExtMulHighI32x4U),
 			needDropBeforeReturn: true,
-			expected: OperationV128ExtMul{
-				OriginShape: ShapeI32x4,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128ExtMul(ShapeI32x4, false, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtendLowI8x16SName, body: v2v(wasm.OpcodeVecI16x8ExtendLowI8x16S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI8x16,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI8x16, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtendHighI8x16SName, body: v2v(wasm.OpcodeVecI16x8ExtendHighI8x16S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI8x16,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI8x16, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtendLowI8x16UName, body: v2v(wasm.OpcodeVecI16x8ExtendLowI8x16U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI8x16,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI8x16, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtendHighI8x16UName, body: v2v(wasm.OpcodeVecI16x8ExtendHighI8x16U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI8x16,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI8x16, false, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtendLowI16x8SName, body: v2v(wasm.OpcodeVecI32x4ExtendLowI16x8S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI16x8,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI16x8, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtendHighI16x8SName, body: v2v(wasm.OpcodeVecI32x4ExtendHighI16x8S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI16x8,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI16x8, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtendLowI16x8UName, body: v2v(wasm.OpcodeVecI32x4ExtendLowI16x8U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI16x8,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI16x8, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtendHighI16x8UName, body: v2v(wasm.OpcodeVecI32x4ExtendHighI16x8U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI16x8,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI16x8, false, false),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtendLowI32x4SName, body: v2v(wasm.OpcodeVecI64x2ExtendLowI32x4S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI32x4,
-				Signed:      true,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI32x4, true, true),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtendHighI32x4SName, body: v2v(wasm.OpcodeVecI64x2ExtendHighI32x4S),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI32x4,
-				Signed:      true,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI32x4, true, false),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtendLowI32x4UName, body: v2v(wasm.OpcodeVecI64x2ExtendLowI32x4U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI32x4,
-				Signed:      false,
-				UseLow:      true,
-			},
+			expected:             NewOperationV128Extend(ShapeI32x4, false, true),
 		},
 		{
 			name: wasm.OpcodeVecI64x2ExtendHighI32x4UName, body: v2v(wasm.OpcodeVecI64x2ExtendHighI32x4U),
 			needDropBeforeReturn: true,
-			expected: OperationV128Extend{
-				OriginShape: ShapeI32x4,
-				Signed:      false,
-				UseLow:      false,
-			},
+			expected:             NewOperationV128Extend(ShapeI32x4, false, false),
 		},
 
 		{
 			name: wasm.OpcodeVecI16x8ExtaddPairwiseI8x16SName, body: v2v(wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtaddPairwiseI8x16UName, body: v2v(wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: false},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtaddPairwiseI16x8SName, body: v2v(wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtaddPairwiseI16x8UName, body: v2v(wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2PromoteLowF32x4ZeroName, body: v2v(wasm.OpcodeVecF64x2PromoteLowF32x4Zero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FloatPromote{},
+			expected:             NewOperationV128FloatPromote(),
 		},
 		{
 			name: wasm.OpcodeVecF32x4DemoteF64x2ZeroName, body: v2v(wasm.OpcodeVecF32x4DemoteF64x2Zero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FloatDemote{},
+			expected:             NewOperationV128FloatDemote(),
 		},
 		{
 			name: wasm.OpcodeVecF32x4ConvertI32x4SName, body: v2v(wasm.OpcodeVecF32x4ConvertI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: true},
+			expected:             NewOperationV128FConvertFromI(ShapeF32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecF32x4ConvertI32x4UName, body: v2v(wasm.OpcodeVecF32x4ConvertI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: false},
+			expected:             NewOperationV128FConvertFromI(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2ConvertLowI32x4SName, body: v2v(wasm.OpcodeVecF64x2ConvertLowI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: true},
+			expected:             NewOperationV128FConvertFromI(ShapeF64x2, true),
 		},
 		{
 			name: wasm.OpcodeVecF64x2ConvertLowI32x4UName, body: v2v(wasm.OpcodeVecF64x2ConvertLowI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: false},
+			expected:             NewOperationV128FConvertFromI(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4DotI16x8SName, body: vv2v(wasm.OpcodeVecI32x4DotI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Dot{},
+			expected:             NewOperationV128Dot(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16NarrowI16x8SName, body: vv2v(wasm.OpcodeVecI8x16NarrowI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Narrow(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16NarrowI16x8UName, body: vv2v(wasm.OpcodeVecI8x16NarrowI16x8U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128Narrow(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8NarrowI32x4SName, body: vv2v(wasm.OpcodeVecI16x8NarrowI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Narrow(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8NarrowI32x4UName, body: vv2v(wasm.OpcodeVecI16x8NarrowI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI32x4, Signed: false},
+			expected:             NewOperationV128Narrow(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF32x4SName, body: v2v(wasm.OpcodeVecI32x4TruncSatF32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: true},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF32x4UName, body: v2v(wasm.OpcodeVecI32x4TruncSatF32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: false},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF64x2SZeroName, body: v2v(wasm.OpcodeVecI32x4TruncSatF64x2SZero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: true},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF64x2, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF64x2UZeroName, body: v2v(wasm.OpcodeVecI32x4TruncSatF64x2UZero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: false},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF64x2, false),
 		},
 	}
 
@@ -2787,18 +2644,21 @@ func TestCompile_Vec(t *testing.T) {
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 
-			var actual Operation
+			res, err := c.Next()
+			require.NoError(t, err)
+
+			var actual UnionOperation
 			if tc.needDropBeforeReturn {
 				// If the drop operation is inserted, the target op exits at -3
 				// as the operations looks like: [... target, drop, br(to return)].
-				actual = res[0].Operations[len(res[0].Operations)-3]
+				actual = res.Operations[len(res.Operations)-3]
 			} else {
 				// If the drop operation is not inserted, the target op exits at -2
 				// as the operations looks like: [... target, br(to return)].
-				actual = res[0].Operations[len(res[0].Operations)-2]
+				actual = res.Operations[len(res.Operations)-2]
 			}
 
 			require.Equal(t, tc.expected, actual)
@@ -2811,7 +2671,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "br",
@@ -2826,7 +2686,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: Label{Kind: LabelKindReturn}}},
+			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 		{
 			name: "br_if",
@@ -2842,7 +2702,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: Label{Kind: LabelKindReturn}}},
+			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 		{
 			name: "br_table",
@@ -2857,16 +2717,19 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: Label{Kind: LabelKindReturn}}},
+			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2877,7 +2740,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "basic",
@@ -2891,12 +2754,12 @@ func TestCompile_drop_vectors(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0x1, Hi: 0x2},
+			expected: []UnionOperation{
+				NewOperationV128Const(0x1, 0x2),
 				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 				// should be translated as drop [0..1] inclusively.
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}},
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},
 	}
@@ -2904,9 +2767,12 @@ func TestCompile_drop_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2915,7 +2781,7 @@ func TestCompile_select_vectors(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []Operation
+		expected []UnionOperation
 	}{
 		{
 			name: "non typed",
@@ -2934,13 +2800,13 @@ func TestCompile_select_vectors(t *testing.T) {
 				}}},
 				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0x1, Hi: 0x2},
-				OperationV128Const{Lo: 0x3, Hi: 0x4},
-				OperationConstI32{Value: 0},
-				OperationSelect{IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}},
+			expected: []UnionOperation{
+				NewOperationV128Const(0x1, 0x2),
+				NewOperationV128Const(0x3, 0x4),
+				NewOperationConstI32(0),
+				NewOperationSelect(true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},
 		{
@@ -2960,13 +2826,13 @@ func TestCompile_select_vectors(t *testing.T) {
 				}}},
 				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
-			expected: []Operation{
-				OperationV128Const{Lo: 0x1, Hi: 0x2},
-				OperationV128Const{Lo: 0x3, Hi: 0x4},
-				OperationConstI32{Value: 0},
-				OperationSelect{IsTargetVector: true},
-				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: Label{Kind: LabelKindReturn}},
+			expected: []UnionOperation{
+				NewOperationV128Const(0x1, 0x2),
+				NewOperationV128Const(0x3, 0x4),
+				NewOperationConstI32(0),
+				NewOperationSelect(true),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},
 	}
@@ -2974,9 +2840,12 @@ func TestCompile_select_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2988,7 +2857,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 		sig                                *wasm.FunctionType
 		functionLocalTypes                 []wasm.ValueType
 		callFrameStackSizeInUint64         int
-		expLocalIndexToStackHeightInUint64 map[uint32]int
+		expLocalIndexToStackHeightInUint64 []int
 	}{
 		{
 			name: "no function local, args>results",
@@ -2998,10 +2867,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  2,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1},
 		},
 		{
 			name: "no function local, args=results",
@@ -3011,9 +2877,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  1,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args>results, with vector",
@@ -3023,11 +2887,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  4,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1, 3},
 		},
 		{
 			name: "no function local, args<results",
@@ -3038,7 +2898,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 1,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{},
+			expLocalIndexToStackHeightInUint64: nil,
 		},
 		{
 			name: "no function local, args<results",
@@ -3049,7 +2909,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 2,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args<results, with vector",
@@ -3060,7 +2920,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 4,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 
 		// With function locals
@@ -3075,11 +2935,11 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, f32, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
 				// Function local comes after call frame.
-				2: 6,
+				6,
 			},
 		},
 		{
@@ -3093,13 +2953,13 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{v128, v128},
 			callFrameStackSizeInUint64: 4,
 			// [i32, v128.lo, v128.hi, f32, callframe.0, callframe.1, callframe.2, callframe.3, v128.lo, v128.hi, v128.lo, v128.hi]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
+				3,
 				// Function local comes after call frame.
-				3: 8,
-				4: 10,
+				8,
+				10,
 			},
 		},
 		{
@@ -3113,10 +2973,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 8,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 8},
 		},
 		{
 			name: "function locals, args<results with vector",
@@ -3129,18 +2986,14 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [v128.lo, v128.hi, f64, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 2,
-				2: 10,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 2, 10},
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			c := &compiler{
+			c := &Compiler{
 				sig: tc.sig, localTypes: tc.functionLocalTypes,
 				callFrameStackSizeInUint64: tc.callFrameStackSizeInUint64,
 			}
@@ -3148,7 +3001,6 @@ func TestCompiler_initializeStack(t *testing.T) {
 			c.initializeStack()
 			require.Equal(t, tc.expLocalIndexToStackHeightInUint64, c.localIndexToStackHeightInUint64)
 		})
-
 	}
 }
 
@@ -3210,9 +3062,12 @@ func Test_ensureTermination(t *testing.T) {
 					},
 				}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
 			require.NoError(t, err)
-			require.Equal(t, tc.exp, Format(res[0].Operations))
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, Format(actual.Operations))
 		})
 	}
 }

@@ -24,7 +24,7 @@ func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
 		panic(err)
 	}
 
-	testDataDir := path.Join(dir, failedCasesDir)
+	testDataDir := path.Join(dir, "fuzz/artifacts/wazero")
 	binaryPath := path.Join(testDataDir, fmt.Sprintf("%s.wasm", checkSumStr))
 	f, err := os.Create(binaryPath)
 	if err != nil {

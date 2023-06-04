@@ -220,32 +220,31 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
+func (j *compilerEnv) requireNewCompiler(t *testing.T, functionType *wasm.FunctionType, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
 	requireSupportedOSArch(t)
 
 	if ir == nil {
 		ir = &wazeroir.CompilationResult{
-			LabelCallers: map[wazeroir.LabelID]uint32{},
-			Signature:    &wasm.FunctionType{},
+			LabelCallers: map[wazeroir.Label]uint32{},
 		}
 	}
 
 	c := fn()
-	c.Init(ir, false)
+	c.Init(functionType, ir, false)
 
 	ret, ok := c.(compilerImpl)
 	require.True(t, ok)
 	return ret
 }
 
-// CompilerImpl is the interface used for architecture-independent unit tests in this pkg.
+// compilerImpl is the interface used for architecture-independent unit tests in this pkg.
 // This is currently implemented by amd64 and arm64.
 type compilerImpl interface {
 	compiler
 	compileExitFromNativeCode(nativeCallStatusCode)
 	compileMaybeGrowStack() error
 	compileReturnFunction() error
-	getOnStackPointerCeilDeterminedCallBack() func(uint64)
+	assignStackPointerCeil(uint64)
 	setStackPointerCeil(uint64)
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
 	setRuntimeValueLocationStack(runtimeValueLocationStack)
@@ -285,4 +284,8 @@ func TestCompileI32WrapFromI64(t *testing.T) {
 	err := c.compileI32WrapFromI64()
 	require.NoError(t, err)
 	require.Equal(t, runtimeValueTypeI32, loc.valueType)
+}
+
+func operationPtr(operation wazeroir.UnionOperation) *wazeroir.UnionOperation {
+	return &operation
 }

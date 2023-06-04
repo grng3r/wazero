@@ -19,8 +19,8 @@ type nodeImpl struct {
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
 	flag       nodeFlag
-	// next holds the next node from this node in the assembled linked list.
-	next *nodeImpl
+	// prev and next hold the prev/next node from this node in the assembled linked list.
+	prev, next *nodeImpl
 
 	types                    operandTypes
 	srcReg, dstReg           asm.Register
@@ -34,8 +34,11 @@ type nodeImpl struct {
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	// jumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .jumpTarget == this.
-	jumpOrigins map[*nodeImpl]struct{}
+	// forwardJumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
+	forwardJumpOrigins *nodeImpl
+	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
+	// and can be traversed from this nodeImpl's forwardJumpOrigins.
+	forwardJumpTarget bool
 
 	staticConst *asm.StaticConst
 }
@@ -228,7 +231,7 @@ type AssemblerImpl struct {
 
 	readInstructionAddressNodes []*nodeImpl
 
-	pool *asm.StaticConstPool
+	pool asm.StaticConstPool
 }
 
 func NewAssembler() *AssemblerImpl {
@@ -264,17 +267,32 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 		n.pos = 0
 	}
 	ret = &n.pages[n.page][n.pos]
-	*ret = nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}
+	*ret = nodeImpl{}
 	n.pos++
 	return
 }
 
+// AllocateNOP implements asm.AssemblerBase.
+func (a *AssemblerImpl) AllocateNOP() asm.Node {
+	n := a.nodePool.allocNode()
+	n.instruction = NOP
+	n.types = operandTypesNoneToNone
+	return n
+}
+
+// Add implements asm.AssemblerBase.
+func (a *AssemblerImpl) Add(n asm.Node) {
+	a.addNode(n.(*nodeImpl))
+}
+
 // Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
+	pool := a.pool
+	pool.Reset()
 	*a = AssemblerImpl{
 		buf:                         a.buf,
 		nodePool:                    a.nodePool,
-		pool:                        asm.NewStaticConstPool(),
+		pool:                        pool,
 		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
 		BaseAssemblerImpl: asm.BaseAssemblerImpl{
@@ -303,6 +321,7 @@ func (a *AssemblerImpl) addNode(node *nodeImpl) {
 	} else {
 		parent := a.current
 		parent.next = node
+		node.prev = parent
 		a.current = node
 	}
 
@@ -310,7 +329,8 @@ func (a *AssemblerImpl) addNode(node *nodeImpl) {
 		origin := o.(*nodeImpl)
 		origin.jumpTarget = node
 	}
-	a.SetBranchTargetOnNextNodes = nil
+	// Reuse the underlying slice to avoid re-allocations.
+	a.SetBranchTargetOnNextNodes = a.SetBranchTargetOnNextNodes[:0]
 }
 
 // EncodeNode encodes the given node into writer.
@@ -356,7 +376,7 @@ func (a *AssemblerImpl) EncodeNode(n *nodeImpl) (err error) {
 
 // Assemble implements asm.AssemblerBase
 func (a *AssemblerImpl) Assemble() ([]byte, error) {
-	a.InitializeNodesForEncoding()
+	a.initializeNodesForEncoding()
 
 	// Continue encoding until we are not forced to re-assemble which happens when
 	// a short relative jump ends up the offset larger than 8-bit length.
@@ -390,9 +410,9 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// InitializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
+// initializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
 // are forward or backward jump.
-func (a *AssemblerImpl) InitializeNodesForEncoding() {
+func (a *AssemblerImpl) initializeNodesForEncoding() {
 	for n := a.root; n != nil; n = n.next {
 		n.flag |= nodeFlagInitializedForEncoding
 		if target := n.jumpTarget; target != nil {
@@ -404,6 +424,41 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 				// We start with assuming that the jump can be short (8-bit displacement).
 				// If it doens't fit, we change this flag in resolveRelativeForwardJump.
 				n.flag |= nodeFlagShortForwardJump
+
+				// If the target node is also the branching instruction, we replace the target with the NOP
+				// node so that we can avoid the collision of the target.forwardJumpOrigins both as destination and origins.
+				if target.types == operandTypesNoneToBranch {
+					// Allocate the NOP node from the pool.
+					nop := a.nodePool.allocNode()
+					nop.instruction = NOP
+					nop.types = operandTypesNoneToNone
+					// Insert it between target.prev and target: [target.prev, target] -> [target.prev, nop, target]
+					prev := target.prev
+					nop.prev = prev
+					prev.next = nop
+					nop.next = target
+					target.prev = nop
+					// Assign this as a jump destination.
+					nop.forwardJumpTarget = true
+					n.jumpTarget = nop
+					target = nop
+				} else {
+					// Otherwise, simply we mark this target as the forward jump target.
+					target.forwardJumpTarget = true
+				}
+
+				// We add this node `n` into the end of the linked list (.forwardJumpOrigins)
+				// beginning from the `target`.
+				tail := target
+				for {
+					if tail.forwardJumpOrigins == nil {
+						// If we found the tail, let's append it.
+						tail.forwardJumpOrigins = n
+						break
+					} else {
+						tail = tail.forwardJumpOrigins
+					}
+				}
 			}
 		}
 	}
@@ -475,7 +530,7 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	}
 
 	const boundaryInBytes int32 = 32
-	const mask int32 = boundaryInBytes - 1
+	const mask = boundaryInBytes - 1
 
 	var padNum int
 	currentPos := int32(a.buf.Len())
@@ -543,11 +598,12 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 	// we try encoding it.
 	savedLen := uint64(a.buf.Len())
 
-	for _, fused := range []*nodeImpl{n, next} {
-		// Encode the node into the temporary buffer.
-		if err = a.EncodeNode(fused); err != nil {
-			return
-		}
+	// Encode the nodes into the buffer.
+	if err = a.EncodeNode(n); err != nil {
+		return
+	}
+	if err = a.EncodeNode(next); err != nil {
+		return
 	}
 
 	ret = int32(uint64(a.buf.Len()) - savedLen)
@@ -935,7 +991,7 @@ func (a *AssemblerImpl) encodeNoneToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
-	RexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -944,11 +1000,11 @@ func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case INCQ:
 		// https://www.felixcloutier.com/x86/inc
-		RexPrefix |= RexPrefixW
+		rexPrefix |= RexPrefixW
 		opcode = 0xff
 	case DECQ:
 		// https://www.felixcloutier.com/x86/dec
-		RexPrefix |= RexPrefixW
+		rexPrefix |= RexPrefixW
 		modRM |= 0b00_001_000 // DEC needs "/1" extension in ModRM.
 		opcode = 0xff
 	case JMP:
@@ -959,14 +1015,14 @@ func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	if RexPrefix != RexPrefixNone {
-		a.buf.WriteByte(RexPrefix)
+	if rexPrefix != RexPrefixNone {
+		a.buf.WriteByte(rexPrefix)
 	}
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -1006,8 +1062,12 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 }
 
 func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
+	if !target.forwardJumpTarget {
+		return
+	}
 	offsetInBinary := int64(target.OffsetInBinary())
-	for origin := range target.jumpOrigins {
+	origin := target.forwardJumpOrigins
+	for ; origin != nil; origin = origin.forwardJumpOrigins {
 		shortJump := origin.isForwardShortJump()
 		op := relativeJumpOpcodes[origin.instruction]
 		instructionLen := op.instructionLen(shortJump)
@@ -1058,7 +1118,6 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 		offsetOfEIP = offsetOfJumpInstruction - op.instructionLen(isShortJump)
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
-		n.jumpTarget.jumpOrigins[n] = struct{}{}
 		isShortJump = n.isForwardShortJump()
 	}
 
@@ -1661,7 +1720,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -1815,8 +1874,8 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 
 	a.buf.WriteByte(modRM)
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -1919,7 +1978,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return a.encodeReadInstructionAddress(n)
 	}
 
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2088,8 +2147,8 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 
 	a.buf.WriteByte(modRM)
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2360,7 +2419,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 		return fmt.Errorf("too large target const %d for %s", n.dstConst, InstructionName(n.instruction))
 	}
 
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2390,8 +2449,8 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2403,7 +2462,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2440,8 +2499,8 @@ func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2471,7 +2530,7 @@ func (a *AssemblerImpl) WriteConst(v int64, length byte) {
 	}
 }
 
-func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, displacementWidth byte, err error) {
+func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi byte, sbiExist bool, displacementWidth byte, err error) {
 	var baseReg, indexReg asm.Register
 	var offset asm.ConstantValue
 	var scale byte
@@ -2494,8 +2553,7 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		err = errors.New("addressing without base register but with index is not implemented")
 	} else if baseReg == asm.NilRegister {
 		modRM = 0b00_000_100 // Indicate that the memory location is specified by SIB.
-		sbiValue := byte(0b00_100_101)
-		sbi = &sbiValue
+		sbi, sbiExist = byte(0b00_100_101), true
 		displacementWidth = 32
 	} else if indexReg == asm.NilRegister {
 		modRM, p, err = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
@@ -2530,8 +2588,7 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		// Thefore we emit the SIB byte before the const so that [SIB + displacement] ends up [register + displacement].
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing_2
 		if baseReg == RegSP || baseReg == RegR12 {
-			sbiValue := byte(0b00_100_100)
-			sbi = &sbiValue
+			sbi, sbiExist = byte(0b00_100_100), true
 		}
 	} else {
 		if indexReg == RegSP {
@@ -2572,22 +2629,21 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		}
 		p |= indexRegPrefix
 
-		sbiValue := baseRegBits | (indexRegBits << 3)
+		sbi, sbiExist = baseRegBits|(indexRegBits<<3), true
 		switch scale {
 		case 1:
-			sbiValue |= 0b00_000_000
+			sbi |= 0b00_000_000
 		case 2:
-			sbiValue |= 0b01_000_000
+			sbi |= 0b01_000_000
 		case 4:
-			sbiValue |= 0b10_000_000
+			sbi |= 0b10_000_000
 		case 8:
-			sbiValue |= 0b11_000_000
+			sbi |= 0b11_000_000
 		default:
 			err = fmt.Errorf("scale in SIB must be one of 1, 2, 4, 8 but got %d", scale)
 			return
 		}
 
-		sbi = &sbiValue
 	}
 	return
 }

@@ -123,6 +123,6 @@ func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
 
 func requireNoError(b *testing.B, err error) {
 	if err != nil {
-		b.Fatal(err)
+		panic(err)
 	}
 }

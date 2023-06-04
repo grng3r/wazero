@@ -11,7 +11,7 @@ import (
 
 func main() {}
 
-const failedCasesDir = "wazerolib/testdata"
+//const failedCasesDir = "wazerolib/testdata"
 
 // saveFailedBinary writes binary and wat into failedCasesDir so that it is easy to reproduce the error.
 func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
@@ -23,7 +23,7 @@ func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
 		panic(err)
 	}
 
-	testDataDir := path.Join(dir, failedCasesDir)
+	testDataDir := path.Join(dir, "fuzz/artifacts/wazero")
 	binaryPath := path.Join(testDataDir, fmt.Sprintf("%s.wasm", checkSumStr))
 	f, err := os.Create(binaryPath)
 	if err != nil {

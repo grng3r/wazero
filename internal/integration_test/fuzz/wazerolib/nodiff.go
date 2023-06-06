@@ -64,7 +64,7 @@ func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr,
 		Cap:  watSize,
 	}))*/
 
-	//failed := true
+	success := true
 	/*defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
@@ -75,12 +75,13 @@ func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr,
 	requireNoDiff(wasmBin, checkMemory, func(err error) {
 		if err != nil {
 			//panic(err)
-			return false
+			success = false
+			return
 		}
 	})
 
 	//failed = false
-	return true
+	return success
 }
 
 // We haven't had public APIs for referencing all the imported entries from wazero.CompiledModule,

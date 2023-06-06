@@ -27,13 +27,13 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		Cap:  binarySize,
 	}))
 
-	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+	/*wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: watPtr,
 		Len:  watSize,
 		Cap:  watSize,
-	}))
+	}))*/
 
-	failed := true
+	//failed := true
 	/*defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
@@ -47,7 +47,7 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		}
 	})
 
-	failed = false
+	//failed = false
 	return
 }
 
@@ -58,11 +58,11 @@ func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr,
 		Cap:  binarySize,
 	}))
 
-	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+	/*wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: watPtr,
 		Len:  watSize,
 		Cap:  watSize,
-	}))
+	}))*/
 
 	//failed := true
 	/*defer func() {

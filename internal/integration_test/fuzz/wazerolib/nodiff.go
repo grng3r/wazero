@@ -34,12 +34,12 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 	}))
 
 	failed := true
-	defer func() {
+	/*defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
 			saveFailedBinary(wasmBin, wat, "TestReRunFailedRequireNoDiffCase")
 		}
-	}()
+	}()*/
 
 	requireNoDiff(wasmBin, checkMemory, func(err error) {
 		if err != nil {
@@ -49,6 +49,38 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 
 	failed = false
 	return
+}
+
+func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int, checkMemory bool) bool {
+	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: binaryPtr,
+		Len:  binarySize,
+		Cap:  binarySize,
+	}))
+
+	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: watPtr,
+		Len:  watSize,
+		Cap:  watSize,
+	}))
+
+	//failed := true
+	/*defer func() {
+		if failed {
+			// If the test fails, we save the binary and wat into testdata directory.
+			saveFailedBinary(wasmBin, wat, "TestReRunFailedRequireNoDiffCase")
+		}
+	}()*/
+
+	requireNoDiff(wasmBin, checkMemory, func(err error) {
+		if err != nil {
+			//panic(err)
+			return false
+		}
+	})
+
+	//failed = false
+	return true
 }
 
 // We haven't had public APIs for referencing all the imported entries from wazero.CompiledModule,

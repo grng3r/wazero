@@ -76,7 +76,6 @@ func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr,
 		if err != nil {
 			//panic(err)
 			success = false
-			return
 		}
 	})
 

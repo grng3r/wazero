@@ -51,6 +51,9 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 	return
 }
 
+// same as require_no_diff but without writing the file and panicking on error, instead we return false
+//
+//export require_no_diff_for_diff
 func require_no_diff_for_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int, checkMemory bool) bool {
 	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: binaryPtr,

@@ -27,11 +27,11 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		Cap:  binarySize,
 	}))
 
-	/*wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: watPtr,
 		Len:  watSize,
 		Cap:  watSize,
-	}))*/
+	}))
 
 	//failed := true
 	defer func() {

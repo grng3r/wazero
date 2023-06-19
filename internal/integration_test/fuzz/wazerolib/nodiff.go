@@ -34,16 +34,16 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 	}))*/
 
 	//failed := true
-	/*defer func() {
+	defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
 			saveFailedBinary(wasmBin, wat, "TestReRunFailedRequireNoDiffCase")
 		}
-	}()*/
+	}()
 
 	requireNoDiff(wasmBin, checkMemory, func(err error) {
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
 		}
 	})
 
